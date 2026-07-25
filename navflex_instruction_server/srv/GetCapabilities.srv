@@ -1,5 +1,0 @@
-# Returns the text commands this instruction server can parse.
----
-string[] capabilities
-string[] examples
-string schema

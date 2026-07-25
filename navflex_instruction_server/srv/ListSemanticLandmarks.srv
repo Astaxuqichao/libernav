@@ -1,4 +1,0 @@
-# List landmarks as compact JSON strings.
-string target_type
----
-string[] landmarks

@@ -25,9 +25,10 @@ namespace
 class ActionGoalChecker : public nav2_core::GoalChecker
 {
 public:
-  ActionGoalChecker(double xy_goal_tolerance, double yaw_goal_tolerance)
+  ActionGoalChecker(double xy_goal_tolerance, double yaw_goal_tolerance,
+    double z_goal_tolerance)
   : xy_goal_tolerance_(xy_goal_tolerance),
-    yaw_goal_tolerance_(yaw_goal_tolerance),
+    yaw_goal_tolerance_(yaw_goal_tolerance), z_goal_tolerance_(z_goal_tolerance),
     xy_goal_tolerance_sq_(xy_goal_tolerance * xy_goal_tolerance) {}
 
   void initialize(
@@ -47,6 +48,9 @@ public:
     if (dx * dx + dy * dy > xy_goal_tolerance_sq_) {
       return false;
     }
+    if (std::fabs(query_pose.position.z - goal_pose.position.z) > z_goal_tolerance_) {
+      return false;
+    }
 
     const double dyaw = angles::shortest_angular_distance(
       tf2::getYaw(query_pose.orientation),
@@ -62,7 +66,7 @@ public:
 
     pose_tolerance.position.x = xy_goal_tolerance_;
     pose_tolerance.position.y = xy_goal_tolerance_;
-    pose_tolerance.position.z = invalid_field;
+    pose_tolerance.position.z = z_goal_tolerance_;
     pose_tolerance.orientation =
       nav2_util::geometry_utils::orientationAroundZAxis(yaw_goal_tolerance_);
 
@@ -79,6 +83,7 @@ public:
 private:
   double xy_goal_tolerance_;
   double yaw_goal_tolerance_;
+  double z_goal_tolerance_;
   double xy_goal_tolerance_sq_;
 };
 
@@ -108,6 +113,7 @@ ControllerRogMapServer::ControllerRogMapServer(
   declare_parameter("controller_frequency", 20.0);
   declare_parameter("controller_plugins", default_ids_);
   declare_parameter("default_xy_goal_tolerance", 0.25);
+  declare_parameter("default_z_goal_tolerance", 0.15);
   declare_parameter("default_yaw_goal_tolerance", 0.25);
   declare_parameter("speed_limit_topic", rclcpp::ParameterValue(std::string("speed_limit")));
   declare_parameter("cmd_vel_topic", rclcpp::ParameterValue(std::string("cmd_vel_nav")));
@@ -374,8 +380,10 @@ void ControllerRogMapServer::callActionFollowPath(
   const double goal_yaw =
     tf2::getYaw(normalized_path.poses.back().pose.orientation);
   double default_xy_goal_tolerance = 0.25;
+  double default_z_goal_tolerance = 0.15;
   double default_yaw_goal_tolerance = 0.25;
   get_parameter("default_xy_goal_tolerance", default_xy_goal_tolerance);
+  get_parameter("default_z_goal_tolerance", default_z_goal_tolerance);
   get_parameter("default_yaw_goal_tolerance", default_yaw_goal_tolerance);
 
   const bool use_default_goal_tolerance =
@@ -398,7 +406,7 @@ void ControllerRogMapServer::callActionFollowPath(
 
   // Create execution object and start
   auto goal_checker = std::make_shared<ActionGoalChecker>(
-    xy_goal_tolerance, yaw_goal_tolerance);
+    xy_goal_tolerance, yaw_goal_tolerance, default_z_goal_tolerance);
   ControllerExecution::Ptr execution =
     newControllerExecution(
     controller_id, goal_checker, xy_goal_tolerance, yaw_goal_tolerance);

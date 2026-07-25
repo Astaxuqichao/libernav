@@ -2,9 +2,36 @@
 
 Navflex 是基于 ROS 2 Humble 和 Nav2 的导航扩展包集合。它把 costmap、规划、控制、BT 行为树、自定义恢复行为、本地仿真和 TB3 manipulation Gazebo 仿真整理成一套可直接启动的导航工作区。
 
-![Navflex 导航演示](navflex/docs/assets/navflex_test_small.gif)
+![Navflex 导航演示](metapackages/navflex/docs/assets/navflex_test_small.gif)
 
-更详细的启动参数和排查命令见 [navflex_bringup/README.md](navflex_bringup/README.md)。
+更详细的启动参数和排查命令见
+[navflex_bringup/README.md](navflex_bringup/README.md)。
+
+## 目录编排
+
+仓库按运行职责组织。目录只负责分组，ROS 2 包名保持不变，colcon 会递归发现各包。
+
+```text
+navflex/
+├── navflex/                   完整功能 metapackage
+├── navflex_bringup/           Launch、参数、地图和 RViz 配置
+├── navflex_nav/               2D/3D 共用导航执行服务
+├── navflex_common/            navflex_utility 和日志库
+├── navflex_3d_navigation/     ROG Map、3D A* 和四足局部规划控制
+├── navflex_costmap_navigation/ Costmap 插件、禁区和 Frontier 规划
+├── navflex_behavior_tree/     BT Navigator、自定义节点和探索行为树
+└── navflex_simulation/        假底盘和仿真激光
+```
+
+工作区外置包：
+
+```text
+../navflex_vln/
+└── navflex_instruction_server/  独立指令、语义地图、任务和 VLN 服务包
+```
+
+依赖方向应保持为：应用和行为树依赖导航层，导航层依赖地图和公共层；底层包不能反向
+依赖应用、部署或仿真目录。
 
 ## 包功能
 
@@ -17,7 +44,6 @@ Navflex 是基于 ROS 2 Humble 和 Nav2 的导航扩展包集合。它把 costma
 | `navflex_bt_nodes` | 自定义 BT 节点，包括 GetPath、ExePath、Recovery；`NavflexExePathAction` 支持运行中路径更新和 FollowPath 容差传递 |
 | `navflex_cmdbehavior` | Nav2 behavior 插件，提供 `rotate`、`linear`、`wait` 等简单恢复/动作命令 |
 | `navflex_exclusion_zone` | Nav2 costmap 电子禁区层插件，可通过话题动态标记禁行区域 |
-| `navflex_instruction_server` | 文本指令、语义地图、任务服务和 VLN/VLM 桥接入口 |
 | `navflex_utility` | 公共工具库，提供机器人状态、TF/odom 查询和导航辅助函数 |
 | `omni_fake_node` | 本地全向虚拟机器人，订阅 `/cmd_vel`，发布 `/odom`、TF 和本地仿真 `/clock` |
 | `simulation_lidar` | 基于 OccupancyGrid 地图射线投射的 2D 仿真激光雷达，发布 `/scan` 和 `/scan_cloud` |
@@ -227,8 +253,8 @@ Navflex 扩展了 `nav2_msgs/action/FollowPath`：
 
 - Bringup、依赖、TB3 仿真和排查：[navflex_bringup/README.md](navflex_bringup/README.md)
 - 核心导航服务端：[navflex_nav/README.md](navflex_nav/README.md)
-- 文本/语义任务入口：[navflex_instruction_server/README.md](navflex_instruction_server/README.md)
-- 本地全向假机器人：[omni_fake_node/README.md](omni_fake_node/README.md)
+- 文本/语义任务入口：[navflex_instruction_server/README.md](../navflex_vln/navflex_instruction_server/README.md)
+- 本地全向假机器人：[omni_fake_node/README.md](navflex_simulation/omni_fake_node/README.md)
 
 ## License
 
