@@ -74,19 +74,21 @@ CostmapNavNode::on_configure(const rclcpp_lifecycle::State &)
     std::make_unique<nav2_util::NodeThread>(local_costmap_);
 
   controller_server_ =
-    std::make_shared<navflex_nav::ControllerCostmapServer>(local_costmap_, robot_info_);
+    std::make_shared<navflex_nav::ControllerCostmapServer>(
+    local_costmap_, robot_info_, std::string{get_namespace()});
   controller_server_->configure();
   controller_server_thread_ =
     std::make_unique<nav2_util::NodeThread>(controller_server_);
 
   planner_server_ =
-    std::make_shared<navflex_nav::PlannerCostmapServer>(global_costmap_, robot_info_);
+    std::make_shared<navflex_nav::PlannerCostmapServer>(
+    global_costmap_, robot_info_, std::string{get_namespace()});
   planner_server_->configure();
   planner_server_thread_ =
     std::make_unique<nav2_util::NodeThread>(planner_server_);
 
   behavior_server_ = std::make_shared<navflex_nav::BehaviorCostmapServer>(
-    global_costmap_, local_costmap_);
+    global_costmap_, local_costmap_, std::string{get_namespace()});
   behavior_server_->configure();
   behavior_server_thread_ =
     std::make_unique<nav2_util::NodeThread>(behavior_server_);

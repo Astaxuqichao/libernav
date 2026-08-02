@@ -2,7 +2,7 @@
 
 Plugins and behaviors that operate on the Nav2 two-dimensional costmap backend.
 
-- `navflex_frontier_planner`: frontier and exploration planning.
+- Frontier planning moved to `navflex_3d_navigation/navflex_frontier_planner`
+  because it now uses the shared ROGMap backend.
 - `navflex_exclusion_zone`: runtime costmap exclusion zones.
 - `navflex_cmdbehavior`: command-driven Nav2 behavior plugin.
-

@@ -45,7 +45,7 @@
             <Control ID="RecoveryNode" name="FollowFAELFrontierPath" number_of_retries="2">
               <Action ID="NavflexExePathAction"
                       angle_to_goal="{controller_angle_to_goal}"
-                      controller_id="FollowPath"
+                      controller_id="ScanController"
                       dist_to_goal="{controller_dist_to_goal}"
                       feedback_distance_to_goal="{controller_feedback_distance_to_goal}"
                       feedback_message="{controller_feedback_message}"

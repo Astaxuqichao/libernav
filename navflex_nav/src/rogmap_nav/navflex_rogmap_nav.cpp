@@ -62,19 +62,21 @@ RogMapNavNode::on_configure(const rclcpp_lifecycle::State &)
   rog_map_thread_ = std::make_unique<nav2_util::NodeThread>(rog_map_);
 
   controller_server_ =
-    std::make_shared<navflex_nav::ControllerRogMapServer>(rog_map_, robot_info_);
+    std::make_shared<navflex_nav::ControllerRogMapServer>(
+    rog_map_, robot_info_, std::string{get_namespace()});
   controller_server_->configure();
   controller_server_thread_ =
     std::make_unique<nav2_util::NodeThread>(controller_server_);
 
   planner_server_ =
-    std::make_shared<navflex_nav::PlannerRogMapServer>(rog_map_, robot_info_);
+    std::make_shared<navflex_nav::PlannerRogMapServer>(
+    rog_map_, robot_info_, std::string{get_namespace()});
   planner_server_->configure();
   planner_server_thread_ =
     std::make_unique<nav2_util::NodeThread>(planner_server_);
 
   behavior_server_ = std::make_shared<navflex_nav::RecoveryRogMapServer>(
-    rog_map_, rog_map_);
+    rog_map_, rog_map_, std::string{get_namespace()});
   behavior_server_->configure();
   behavior_server_thread_ =
     std::make_unique<nav2_util::NodeThread>(behavior_server_);

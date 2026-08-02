@@ -87,9 +87,10 @@ private:
 ControllerCostmapServer::ControllerCostmapServer(
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros,
   const navflex_utility::RobotInformation::ConstPtr & robot_info,
+  const std::string & parent_namespace,
   const rclcpp::NodeOptions & options)
 : nav2_util::LifecycleNode(
-    "navflex_controller_server", "",
+    "navflex_controller_server", parent_namespace,
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_controller_server") + ":" +

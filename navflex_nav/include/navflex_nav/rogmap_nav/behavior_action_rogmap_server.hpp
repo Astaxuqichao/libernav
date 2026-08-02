@@ -47,6 +47,7 @@ public:
   explicit RecoveryRogMapServer(
     std::shared_ptr<navflex_rog_map::RogMapROS> global_rog_map_ros,
     std::shared_ptr<navflex_rog_map::RogMapROS> local_rog_map_ros,
+    const std::string & parent_namespace,
     const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   ~RecoveryRogMapServer();

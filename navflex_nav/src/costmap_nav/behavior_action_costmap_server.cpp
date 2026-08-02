@@ -19,9 +19,10 @@ namespace navflex_nav
 BehaviorCostmapServer::BehaviorCostmapServer(
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> global_costmap_ros,
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> local_costmap_ros,
+  const std::string & parent_namespace,
   const rclcpp::NodeOptions & options)
 : nav2_util::LifecycleNode(
-    "navflex_behavior_server", "",
+    "navflex_behavior_server", parent_namespace,
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_behavior_server") + ":" +

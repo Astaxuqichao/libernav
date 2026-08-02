@@ -6,6 +6,7 @@ execution framework and both costmap and ROG-Map backends in one library.
 ```bash
 ros2 launch navflex_nav navflex_nav.launch.py navigation_type:=costmap
 ros2 launch navflex_nav navflex_nav.launch.py navigation_type:=rogmap
+ros2 launch navflex_nav navflex_nav.launch.py navigation_type:=both
 ```
 
 `costmap` creates `CostmapNavNode` and loads `nav2_core` plugins. `rogmap`
@@ -13,6 +14,18 @@ creates `RogMapNavNode` and loads `navflex_rogmap_core` plugins. Both backends
 use the same Action classes, execution state machines, cancellation handling,
 retry logic, and robot information layer through internal plugin adapters. In
 both modes the top-level lifecycle node is named `navflex_nav`.
+
+With `navigation_type:=both`, the costmap backend keeps the existing root
+interfaces while the ROGMap backend runs in `/rogmap`:
+
+| Backend | Lifecycle node | Plan action | Control action |
+| --- | --- | --- | --- |
+| Costmap | `/navflex_nav` | `/compute_path_to_pose` | `/follow_path` |
+| ROGMap | `/rogmap/navflex_nav` | `/rogmap/compute_path_to_pose` | `/rogmap/follow_path` |
+
+The two controllers have separate velocity topics. Do not remap both outputs
+directly to the robot at the same time; select one with a command-velocity mux
+or an equivalent arbitration layer.
 
 Source layout:
 

@@ -19,27 +19,35 @@ int main(int argc, char ** argv)
 
   rclcpp::NodeOptions options;
   options.arguments({"--ros-args", "-r", "__node:=navflex_nav"});
-  std::shared_ptr<nav2_util::LifecycleNode> navigation_node;
+  std::vector<std::shared_ptr<nav2_util::LifecycleNode>> navigation_nodes;
   if (navigation_type == "costmap") {
-    navigation_node = std::make_shared<navflex_nav::CostmapNavNode>(options);
+    navigation_nodes.push_back(std::make_shared<navflex_nav::CostmapNavNode>(options));
   } else if (navigation_type == "rogmap") {
-    navigation_node = std::make_shared<navflex_nav::RogMapNavNode>(options);
+    navigation_nodes.push_back(std::make_shared<navflex_nav::RogMapNavNode>(options));
+  } else if (navigation_type == "both") {
+    navigation_nodes.push_back(std::make_shared<navflex_nav::CostmapNavNode>(options));
+    rclcpp::NodeOptions rogmap_options;
+    rogmap_options.arguments(
+      {"--ros-args", "-r", "__node:=navflex_nav", "-r", "__ns:=/rogmap"});
+    navigation_nodes.push_back(std::make_shared<navflex_nav::RogMapNavNode>(rogmap_options));
   } else {
     RCLCPP_FATAL(
       rclcpp::get_logger("navflex_nav"),
-      "Invalid navigation_type '%s'; expected 'costmap' or 'rogmap'",
+      "Invalid navigation_type '%s'; expected 'costmap', 'rogmap', or 'both'",
       navigation_type.c_str());
     rclcpp::shutdown();
     return 1;
   }
 
   RCLCPP_INFO(
-    navigation_node->get_logger(), "Starting navflex_nav in %s mode",
-    navigation_type.c_str());
-  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 4);
-  executor.add_node(navigation_node->get_node_base_interface());
+    rclcpp::get_logger("navflex_nav"), "Starting navflex_nav in %s mode with %zu backend(s)",
+    navigation_type.c_str(), navigation_nodes.size());
+  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 8);
+  for (const auto & navigation_node : navigation_nodes) {
+    executor.add_node(navigation_node->get_node_base_interface());
+  }
   executor.spin();
-  navigation_node.reset();
+  navigation_nodes.clear();
   rclcpp::shutdown();
   return 0;
 }

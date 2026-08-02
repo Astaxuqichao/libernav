@@ -25,7 +25,8 @@ namespace
 class ActionGoalChecker : public nav2_core::GoalChecker
 {
 public:
-  ActionGoalChecker(double xy_goal_tolerance, double yaw_goal_tolerance,
+  ActionGoalChecker(
+    double xy_goal_tolerance, double yaw_goal_tolerance,
     double z_goal_tolerance)
   : xy_goal_tolerance_(xy_goal_tolerance),
     yaw_goal_tolerance_(yaw_goal_tolerance), z_goal_tolerance_(z_goal_tolerance),
@@ -92,9 +93,10 @@ private:
 ControllerRogMapServer::ControllerRogMapServer(
   std::shared_ptr<navflex_rog_map::RogMapROS> rog_map_ros,
   const navflex_utility::RobotInformation::ConstPtr & robot_info,
+  const std::string & parent_namespace,
   const rclcpp::NodeOptions & options)
 : nav2_util::LifecycleNode(
-    "navflex_controller_server", "",
+    "navflex_controller_server", parent_namespace,
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_controller_server") + ":" +

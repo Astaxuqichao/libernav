@@ -95,6 +95,10 @@ colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 ```
 
+`navflex_frontier_planner` 位于 `navflex_3d_navigation`，并仅由 ROGMap
+导航后端加载。点云由 `navflex_rog_map` 统一订阅，frontier 插件直接读取共享
+ROGMap，不再维护 UFOMap。
+
 仅调试 Navflex bringup 时，可选择性编译：
 
 ```bash
@@ -126,6 +130,22 @@ ROGMap 时使用：
 ```bash
 ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=rogmap
 ```
+
+需要同时启动二维 costmap 与三维 ROGMap 导航时：
+
+```bash
+ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=both
+```
+
+`both` 模式保留 costmap 的根命名空间接口，并将 ROGMap 放到 `/rogmap`：
+
+| 后端 | 生命周期节点 | 规划 action | 控制 action |
+| --- | --- | --- | --- |
+| Costmap | `/navflex_nav` | `/compute_path_to_pose` | `/follow_path` |
+| ROGMap | `/rogmap/navflex_nav` | `/rogmap/compute_path_to_pose` | `/rogmap/follow_path` |
+
+两套 controller 的速度输出相互隔离。接入真实底盘时应通过速度 mux 或等价
+仲裁机制选择当前后端，不要将两个输出同时直连底盘。
 
 底盘参数选择：
 

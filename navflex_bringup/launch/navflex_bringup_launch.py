@@ -20,6 +20,8 @@ def launch_setup(context, *args, **kwargs):
     autostart = LaunchConfiguration('autostart')
     chassis_model = LaunchConfiguration('chassis_model')
     params_file_arg = LaunchConfiguration('params_file')
+    costmap_params_file_arg = LaunchConfiguration('costmap_params_file')
+    rogmap_params_file_arg = LaunchConfiguration('rogmap_params_file')
     bt_params_file = LaunchConfiguration('bt_params_file')
     bt_xml_arg = LaunchConfiguration('default_nav_to_pose_bt_xml')
     use_respawn = LaunchConfiguration('use_respawn')
@@ -36,10 +38,10 @@ def launch_setup(context, *args, **kwargs):
     with_bt_navigator = use_bt_navigator.perform(context).lower() in ('true', '1', 'yes')
     selected_chassis = chassis_model.perform(context).lower()
     selected_navigation_type = navigation_type.perform(context).lower()
-    if selected_navigation_type not in ('costmap', 'rogmap'):
+    if selected_navigation_type not in ('costmap', 'rogmap', 'both'):
         raise ValueError(
             f'Unsupported navigation_type "{selected_navigation_type}". '
-            'Expected "costmap" or "rogmap".')
+            'Expected "costmap", "rogmap", or "both".')
     params_file = params_file_arg.perform(context)
     bt_xml = bt_xml_arg.perform(context)
 
@@ -51,64 +53,97 @@ def launch_setup(context, *args, **kwargs):
             if selected_navigation_type == 'rogmap'
             else 'test_bt_navigator.xml')
 
-    if not params_file:
-        if selected_navigation_type == 'rogmap':
-            params_file = os.path.join(bringup_dir, 'params', 'rogmap_params.yaml')
-        elif selected_chassis == 'omni':
-            params_file = os.path.join(bringup_dir, 'params', 'nav2_params.yaml')
-        elif selected_chassis == 'diff':
-            params_file = os.path.join(bringup_dir, 'params', 'nav2_params_tb3_diff.yaml')
-        else:
-            raise ValueError(
-                f'Unsupported chassis_model "{selected_chassis}". '
-                'Expected "omni" or "diff".')
+    if selected_chassis == 'omni':
+        default_costmap_params = os.path.join(bringup_dir, 'params', 'nav2_params.yaml')
+    elif selected_chassis == 'diff':
+        default_costmap_params = os.path.join(
+            bringup_dir, 'params', 'nav2_params_tb3_diff.yaml')
+    else:
+        raise ValueError(
+            f'Unsupported chassis_model "{selected_chassis}". '
+            'Expected "omni" or "diff".')
+    default_rogmap_params = os.path.join(bringup_dir, 'params', 'rogmap_params.yaml')
+
+    costmap_params_file = costmap_params_file_arg.perform(context)
+    rogmap_params_file = rogmap_params_file_arg.perform(context)
+    if selected_navigation_type == 'both':
+        costmap_params_file = costmap_params_file or params_file or default_costmap_params
+        rogmap_params_file = rogmap_params_file or default_rogmap_params
+        params_file = costmap_params_file
+    elif selected_navigation_type == 'costmap':
+        params_file = params_file or costmap_params_file or default_costmap_params
+    else:
+        params_file = params_file or rogmap_params_file or default_rogmap_params
 
     lifecycle_nodes = ['navflex_nav']
+    if selected_navigation_type == 'both':
+        lifecycle_nodes.append('rogmap/navflex_nav')
     if with_route:
         lifecycle_nodes.append('route_server')
-    if selected_navigation_type == 'costmap':
+    if selected_navigation_type in ('costmap', 'both'):
         lifecycle_nodes.append('velocity_smoother')
     if with_bt_navigator:
         lifecycle_nodes.append('bt_navigator')
 
     remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
 
-    configured_params = ParameterFile(
-        RewrittenYaml(
-            source_file=params_file,
-            root_key=namespace,
-            param_rewrites={
-                'use_sim_time': use_sim_time,
-                'autostart': autostart,
-            },
-            convert_types=True),
-        allow_substs=True)
+    def configured(source_file, root_key):
+        return ParameterFile(
+            RewrittenYaml(
+                source_file=source_file,
+                root_key=root_key,
+                param_rewrites={
+                    'use_sim_time': use_sim_time,
+                    'autostart': autostart,
+                },
+                convert_types=True),
+            allow_substs=True)
 
-    composable_nodes = [
-        ComposableNode(
+    configured_params = configured(params_file, namespace)
+    configured_costmap_params = (
+        configured(costmap_params_file, namespace)
+        if selected_navigation_type == 'both' else configured_params)
+    configured_rogmap_params = (
+        configured(rogmap_params_file, 'rogmap')
+        if selected_navigation_type == 'both' else configured_params)
+
+    composable_nodes = []
+    if selected_navigation_type in ('costmap', 'both'):
+        composable_nodes.append(ComposableNode(
             package='navflex_nav',
-            plugin=(
-                'navflex_nav::CostmapNavNode'
-                if selected_navigation_type == 'costmap'
-                else 'navflex_nav::RogMapNavNode'),
+            plugin='navflex_nav::CostmapNavNode',
             name='navflex_nav',
             parameters=[
                 {'use_sim_time': use_sim_time},
                 {'navigation_type': navigation_type},
-                configured_params,
+                configured_costmap_params,
             ],
             extra_arguments=[
                 {'use_intra_process_comms': use_intra_process_comms},
             ],
-            remappings=remappings),
-    ]
+            remappings=remappings))
+    if selected_navigation_type in ('rogmap', 'both'):
+        composable_nodes.append(ComposableNode(
+            package='navflex_nav',
+            plugin='navflex_nav::RogMapNavNode',
+            namespace='rogmap' if selected_navigation_type == 'both' else '',
+            name='navflex_nav',
+            parameters=[
+                {'use_sim_time': use_sim_time},
+                {'navigation_type': navigation_type},
+                configured_rogmap_params,
+            ],
+            extra_arguments=[
+                {'use_intra_process_comms': use_intra_process_comms},
+            ],
+            remappings=remappings))
 
-    if selected_navigation_type == 'costmap':
+    if selected_navigation_type in ('costmap', 'both'):
         composable_nodes.append(ComposableNode(
             package='nav2_velocity_smoother',
             plugin='nav2_velocity_smoother::VelocitySmoother',
             name='velocity_smoother',
-            parameters=[configured_params],
+            parameters=[configured_costmap_params],
             extra_arguments=[
                 {'use_intra_process_comms': use_intra_process_comms},
             ],
@@ -139,8 +174,9 @@ def launch_setup(context, *args, **kwargs):
             respawn_delay=2.0,
             parameters=[
                 {'use_sim_time': use_sim_time},
+                configured_costmap_params,
+                configured_rogmap_params,
                 {'navigation_type': navigation_type},
-                configured_params,
             ],
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings),
@@ -151,7 +187,7 @@ def launch_setup(context, *args, **kwargs):
             executable='component_container_isolated',
             name=container_name,
             output='screen',
-            parameters=[configured_params],
+            parameters=[configured_costmap_params, configured_rogmap_params],
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings),
 
@@ -216,13 +252,13 @@ def launch_setup(context, *args, **kwargs):
         Node(
             condition=(
                 UnlessCondition(use_composition)
-                if selected_navigation_type == 'costmap'
+                if selected_navigation_type in ('costmap', 'both')
                 else IfCondition('false')),
             package='nav2_velocity_smoother',
             executable='velocity_smoother',
             name='velocity_smoother',
             output='screen',
-            parameters=[configured_params],
+            parameters=[configured_costmap_params],
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', 'cmd_vel')]),
 
@@ -259,9 +295,13 @@ def generate_launch_description():
         DeclareLaunchArgument('chassis_model', default_value='omni',
                               description='Chassis model selecting navigation parameters: omni or diff'),
         DeclareLaunchArgument('navigation_type', default_value='costmap',
-                              description='Navigation backend: costmap or rogmap'),
+                              description='Navigation backend: costmap, rogmap, or both'),
         DeclareLaunchArgument('params_file', default_value='',
                               description='Optional parameter file override. Empty selects by navigation type'),
+        DeclareLaunchArgument('costmap_params_file', default_value='',
+                              description='Costmap parameters used by navigation_type=both'),
+        DeclareLaunchArgument('rogmap_params_file', default_value='',
+                              description='ROGMap parameters used by navigation_type=both'),
         DeclareLaunchArgument('bt_params_file', default_value=default_bt_params_file,
                               description='Full path to the bt_navigator parameters file'),
         DeclareLaunchArgument('default_nav_to_pose_bt_xml', default_value='',

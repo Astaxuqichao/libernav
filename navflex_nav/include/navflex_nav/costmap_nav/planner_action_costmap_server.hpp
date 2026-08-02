@@ -80,6 +80,7 @@ public:
   explicit PlannerCostmapServer(
     const std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros,
     const navflex_utility::RobotInformation::ConstPtr & robot_info,
+    const std::string & parent_namespace,
     const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   /**

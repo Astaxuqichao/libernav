@@ -7,10 +7,10 @@ The tree repeatedly:
 
 1. calls `NavflexGetPathAction` on `/compute_path_to_pose` with planner ID
    `FrontierAStar`;
-2. lets `navflex_frontier_planner/FrontierAStarPlanner` select and plan to the
-   best FAEL-style frontier viewpoint;
+2. lets the ROGMap-based `navflex_frontier_planner/FrontierAStarPlanner`
+   select and plan to the best frontier viewpoint;
 3. sends the returned path to `NavflexExePathAction` on `/follow_path` with
-   controller ID `FollowPath`;
+   ROGMap controller ID `ScanController`;
 4. performs costmap clearing plus simple rotate/wait/back-up recovery actions
    when planning or following fails.
 
@@ -30,10 +30,9 @@ colcon build --packages-select navflex_autonomous_exploration_bt
 ros2 launch navflex_autonomous_exploration_bt fael_exploration.launch.py
 ```
 
-The launch file wraps `navflex_bringup navflex_bringup_launch.py` and replaces
-only the `bt_navigator` XML and plugin parameter file. The default NavFlex
-bringup parameters already include the `FrontierAStar` planner and use
-`/scan_cloud` as the point-cloud input.
+Start Navflex with `navigation_type:=rogmap` before launching exploration. The
+ROGMap server consumes `/scan_cloud`; the frontier plugin receives the shared
+ROGMap instance and does not subscribe to point clouds itself.
 
 ## Trigger exploration
 
@@ -73,7 +72,6 @@ Useful visualization topics:
 ```text
 /frontier_exploration/selected_candidate
 /frontier_exploration/candidates
-/frontier_exploration/topology_map
-/frontier_exploration/ufomap_occupied_cloud
-/frontier_exploration/ufomap_free_cloud
+/rog_map/global_occupied
+/rog_map/local_occupied
 ```

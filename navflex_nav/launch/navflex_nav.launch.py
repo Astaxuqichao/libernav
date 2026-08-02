@@ -10,7 +10,11 @@ def generate_launch_description():
     navigation_type = LaunchConfiguration("navigation_type")
     params_file = LaunchConfiguration("params_file")
     return LaunchDescription([
-        DeclareLaunchArgument("navigation_type", default_value="costmap"),
+        DeclareLaunchArgument(
+            "navigation_type",
+            default_value="costmap",
+            description="Navigation backend: costmap, rogmap, or both",
+        ),
         DeclareLaunchArgument(
             "params_file",
             default_value=PathJoinSubstitution([

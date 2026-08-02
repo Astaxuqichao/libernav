@@ -19,9 +19,10 @@ namespace navflex_nav
 RecoveryRogMapServer::RecoveryRogMapServer(
   std::shared_ptr<navflex_rog_map::RogMapROS> global_rog_map_ros,
   std::shared_ptr<navflex_rog_map::RogMapROS> local_rog_map_ros,
+  const std::string & parent_namespace,
   const rclcpp::NodeOptions & options)
 : nav2_util::LifecycleNode(
-    "navflex_behavior_server", "",
+    "navflex_behavior_server", parent_namespace,
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_behavior_server") + ":" +
