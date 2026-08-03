@@ -28,7 +28,7 @@ namespace navflex_bt_nodes
  *        (nav2_msgs::action::DummyBehavior).
  *
  * Mirrors the BehaviorAction / BehaviorCostmapServer in navflex_costmap_nav.
- * The server name "behavior_action" matches the string registered in
+ * The default server name "/costmap/behavior_action" matches the action registered in
  * BehaviorCostmapServer (name_action_behavior_).
  *
  * The DummyBehavior goal carries:
@@ -115,7 +115,7 @@ private:
  *
  * BT XML example:
  * @code{.xml}
- *   <NavflexCancelRecovery server_name="behavior_action"/>
+ *   <NavflexCancelRecovery server_name="/costmap/behavior_action"/>
  * @endcode
  */
 class CancelRecoveryAction

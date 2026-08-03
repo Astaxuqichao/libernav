@@ -101,7 +101,7 @@ BT_REGISTER_NODES(factory)
       [](const std::string & name, const BT::NodeConfiguration & config)
       {
         return std::make_unique<navflex_bt_nodes::RecoveryAction>(
-          name, "behavior_action", config);
+          name, "/costmap/behavior_action", config);
       };
     factory.registerBuilder<navflex_bt_nodes::RecoveryAction>(
       "NavflexRecoveryAction", builder);
@@ -113,7 +113,7 @@ BT_REGISTER_NODES(factory)
       [](const std::string & name, const BT::NodeConfiguration & config)
       {
         return std::make_unique<navflex_bt_nodes::CancelRecoveryAction>(
-          name, "behavior_action", config);
+          name, "/costmap/behavior_action", config);
       };
     factory.registerBuilder<navflex_bt_nodes::CancelRecoveryAction>(
       "NavflexCancelRecovery", builder);

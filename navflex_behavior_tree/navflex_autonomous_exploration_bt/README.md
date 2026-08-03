@@ -5,11 +5,11 @@ FAEL-style frontier exploration with NavFlex.
 
 The tree repeatedly:
 
-1. calls `NavflexGetPathAction` on `/compute_path_to_pose` with planner ID
+1. calls `NavflexGetPathAction` on `/rogmap/compute_path_to_pose` with planner ID
    `FrontierAStar`;
 2. lets the ROGMap-based `navflex_frontier_planner/FrontierAStarPlanner`
    select and plan to the best frontier viewpoint;
-3. sends the returned path to `NavflexExePathAction` on `/follow_path` with
+3. sends the returned path to `NavflexExePathAction` on `/rogmap/follow_path` with
    ROGMap controller ID `ScanController`;
 4. performs costmap clearing plus simple rotate/wait/back-up recovery actions
    when planning or following fails.

@@ -108,7 +108,8 @@ navflex_controller_server:
     controller_required_consecutive_valid_cmds: 3
     default_xy_goal_tolerance: 0.2
     default_yaw_goal_tolerance: 0.2
-    cmd_vel_topic: cmd_vel
+    # Both navigation backends ultimately command the same robot base.
+    cmd_vel_topic: /cmd_vel
     speed_limit_topic: speed_limit
     ScanController:
       plugin: scan_planner/ScanController

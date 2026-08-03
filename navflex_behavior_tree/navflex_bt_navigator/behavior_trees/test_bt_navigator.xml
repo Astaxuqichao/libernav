@@ -6,25 +6,25 @@
             <Control ID="PipelineSequence" name="NavigateWithReplanning">
                 <Decorator ID="RateController" hz="1.0">
                     <Control ID="RecoveryNode" name="ComputePathToPose" number_of_retries="1">
-                        <Action ID="NavflexGetPathAction" goal="{goal}" message="{planner_message}" outcome="{planner_outcome}" path="{path}" planner_id="Smac2D" server_name="compute_path_to_pose" server_timeout="1000" tolerance="0.5" use_start="false"/>
-                        <Action ID="ClearEntireCostmap" name="ClearGlobalCostmap-Context" server_timeout="1000" service_name="global_costmap/clear_entirely_global_costmap"/>
+                        <Action ID="NavflexGetPathAction" goal="{goal}" message="{planner_message}" outcome="{planner_outcome}" path="{path}" planner_id="Smac2D" server_name="/costmap/compute_path_to_pose" server_timeout="1000" tolerance="0.5" use_start="false"/>
+                        <Action ID="ClearEntireCostmap" name="ClearGlobalCostmap-Context" server_timeout="1000" service_name="/costmap/global_costmap/clear_entirely_global_costmap"/>
                     </Control>
                 </Decorator>
                 <Control ID="RecoveryNode" name="FollowPath" number_of_retries="1">
-                    <Action ID="NavflexExePathAction" angle_to_goal="{controller_angle_to_goal}" controller_id="FollowPath" dist_to_goal="{controller_dist_to_goal}" feedback_distance_to_goal="{controller_feedback_distance_to_goal}" feedback_message="{controller_feedback_message}" feedback_outcome="{controller_feedback_outcome}" feedback_speed="{controller_feedback_speed}" final_pose="{controller_final_pose}" message="{controller_message}" outcome="{controller_outcome}" path="{path}" server_name="follow_path" server_timeout="1000" xy_goal_tolerance="0.0" yaw_goal_tolerance="0.0"/>
-                    <Action ID="ClearEntireCostmap" name="ClearLocalCostmap-Context" server_timeout="1000" service_name="local_costmap/clear_entirely_local_costmap"/>
+                    <Action ID="NavflexExePathAction" angle_to_goal="{controller_angle_to_goal}" controller_id="FollowPath" dist_to_goal="{controller_dist_to_goal}" feedback_distance_to_goal="{controller_feedback_distance_to_goal}" feedback_message="{controller_feedback_message}" feedback_outcome="{controller_feedback_outcome}" feedback_speed="{controller_feedback_speed}" final_pose="{controller_final_pose}" message="{controller_message}" outcome="{controller_outcome}" path="{path}" server_name="/costmap/follow_path" server_timeout="1000" xy_goal_tolerance="0.0" yaw_goal_tolerance="0.0"/>
+                    <Action ID="ClearEntireCostmap" name="ClearLocalCostmap-Context" server_timeout="1000" service_name="/costmap/local_costmap/clear_entirely_local_costmap"/>
                 </Control>
             </Control>
             <ReactiveFallback name="RecoveryFallback">
                 <Condition ID="GoalUpdated"/>
                 <Control ID="RoundRobin" name="RecoveryActions">
                     <Sequence name="ClearingActions">
-                        <Action ID="ClearEntireCostmap" name="ClearLocalCostmap-Subtree" server_timeout="1000" service_name="local_costmap/clear_entirely_local_costmap"/>
-                        <Action ID="ClearEntireCostmap" name="ClearGlobalCostmap-Subtree" server_timeout="1000" service_name="global_costmap/clear_entirely_global_costmap"/>
+                        <Action ID="ClearEntireCostmap" name="ClearLocalCostmap-Subtree" server_timeout="1000" service_name="/costmap/local_costmap/clear_entirely_local_costmap"/>
+                        <Action ID="ClearEntireCostmap" name="ClearGlobalCostmap-Subtree" server_timeout="1000" service_name="/costmap/global_costmap/clear_entirely_global_costmap"/>
                     </Sequence>
-                    <Action ID="NavflexRecoveryAction" behavior="cmd_behavior" command="rotate 1.57" message="{recovery_rotate_message}" outcome="{recovery_rotate_outcome}" server_name="behavior_action" server_timeout="1000" used_plugin="{recovery_rotate_used_plugin}"/>
-                    <Action ID="NavflexRecoveryAction" behavior="cmd_behavior" command="wait 5" message="{recovery_wait_message}" outcome="{recovery_wait_outcome}" server_name="behavior_action" server_timeout="1000" used_plugin="{recovery_wait_used_plugin}"/>
-                    <Action ID="NavflexRecoveryAction" behavior="cmd_behavior" command="linear -0.3" message="{recovery_linear_message}" outcome="{recovery_linear_outcome}" server_name="behavior_action" server_timeout="1000" used_plugin="{recovery_linear_used_plugin}"/>
+                    <Action ID="NavflexRecoveryAction" behavior="cmd_behavior" command="rotate 1.57" message="{recovery_rotate_message}" outcome="{recovery_rotate_outcome}" server_name="/costmap/behavior_action" server_timeout="1000" used_plugin="{recovery_rotate_used_plugin}"/>
+                    <Action ID="NavflexRecoveryAction" behavior="cmd_behavior" command="wait 5" message="{recovery_wait_message}" outcome="{recovery_wait_outcome}" server_name="/costmap/behavior_action" server_timeout="1000" used_plugin="{recovery_wait_used_plugin}"/>
+                    <Action ID="NavflexRecoveryAction" behavior="cmd_behavior" command="linear -0.3" message="{recovery_linear_message}" outcome="{recovery_linear_outcome}" server_name="/costmap/behavior_action" server_timeout="1000" used_plugin="{recovery_linear_used_plugin}"/>
                 </Control>
             </ReactiveFallback>
         </Control>
@@ -155,7 +155,7 @@
         </Condition>
         <Condition ID="IsStuck"/>
         <Action ID="NavflexCancelExePath">
-            <input_port default="follow_path" name="server_name" type="string">
+            <input_port default="/costmap/follow_path" name="server_name" type="string">
         Action server name to cancel
       </input_port>
             <input_port default="1000" name="server_timeout" type="double">
@@ -163,7 +163,7 @@
       </input_port>
         </Action>
         <Action ID="NavflexCancelGetPath">
-            <input_port default="compute_path_to_pose" name="server_name" type="string">
+            <input_port default="/costmap/compute_path_to_pose" name="server_name" type="string">
         Action server name to cancel
       </input_port>
             <input_port default="1000" name="server_timeout" type="double">
@@ -171,7 +171,7 @@
       </input_port>
         </Action>
         <Action ID="NavflexCancelRecovery">
-            <input_port default="behavior_action" name="server_name" type="string">
+            <input_port default="/costmap/behavior_action" name="server_name" type="string">
         Action server name to cancel
       </input_port>
             <input_port default="1000" name="server_timeout" type="double">
@@ -209,7 +209,7 @@
             <input_port default="1.0" name="server_timeout" type="double">
         Server timeout (seconds)
       </input_port>
-            <input_port default="check_path_cost" name="service_name" type="string">
+            <input_port default="/costmap/check_path_cost" name="service_name" type="string">
         Service name
       </input_port>
             <input_port default="0" name="skip_poses" type="uint8">
@@ -235,7 +235,7 @@
             <input_port default="1.0" name="server_timeout" type="double">
         Server timeout (seconds)
       </input_port>
-            <input_port default="check_point_cost" name="service_name" type="string">
+            <input_port default="/costmap/check_point_cost" name="service_name" type="string">
         Service name
       </input_port>
             <output_port name="state" type="uint8">
@@ -267,7 +267,7 @@
             <input_port default="1.0" name="server_timeout" type="double">
         Server timeout (seconds)
       </input_port>
-            <input_port default="check_pose_cost" name="service_name" type="string">
+            <input_port default="/costmap/check_pose_cost" name="service_name" type="string">
         Service name
       </input_port>
             <output_port name="state" type="uint8">
@@ -321,7 +321,7 @@
             <input_port name="path" type="nav_msgs/Path">
         Global path to follow
       </input_port>
-            <input_port default="follow_path" name="server_name" type="string">
+            <input_port default="/costmap/follow_path" name="server_name" type="string">
         Action server name
       </input_port>
             <input_port default="1000" name="server_timeout" type="double">
@@ -346,7 +346,7 @@
             <input_port default="GridBased" name="planner_id" type="string">
         Planner plugin ID (must match a key in planner_plugins)
       </input_port>
-            <input_port default="compute_path_to_pose" name="server_name" type="string">
+            <input_port default="/costmap/compute_path_to_pose" name="server_name" type="string">
         Action server name
       </input_port>
             <input_port default="1000" name="server_timeout" type="double">
@@ -377,7 +377,7 @@
         153=TF_ERROR 154=NOT_INITIALIZED 155=INVALID_PLUGIN
         156=INTERNAL_ERROR 157=STOPPED 158=IMPASSABLE
       </output_port>
-            <input_port default="behavior_action" name="server_name" type="string">
+            <input_port default="/costmap/behavior_action" name="server_name" type="string">
         Action server name
       </input_port>
             <input_port default="1000" name="server_timeout" type="double">

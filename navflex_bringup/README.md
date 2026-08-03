@@ -137,11 +137,11 @@ ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=rogmap
 ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=both
 ```
 
-`both` 模式保留 costmap 的根命名空间接口，并将 ROGMap 放到 `/rogmap`：
+无论单后端还是双后端，接口都使用稳定的后端命名空间：
 
 | 后端 | 生命周期节点 | 规划 action | 控制 action |
 | --- | --- | --- | --- |
-| Costmap | `/navflex_nav` | `/compute_path_to_pose` | `/follow_path` |
+| Costmap | `/costmap/navflex_nav` | `/costmap/compute_path_to_pose` | `/costmap/follow_path` |
 | ROGMap | `/rogmap/navflex_nav` | `/rogmap/compute_path_to_pose` | `/rogmap/follow_path` |
 
 两套 controller 的速度输出相互隔离。接入真实底盘时应通过速度 mux 或等价
@@ -335,7 +335,6 @@ ros2 launch navflex_bringup navflex_bringup_launch.py
 | `log_level` | `info` | 日志等级 |
 | `use_route_server` | `False` | 是否启动 `nav2_route` |
 | `graph_filepath` | `nav2_route/graphs/sample_graph.geojson` | route graph 文件 |
-| `namespace` | empty | 顶层 namespace |
 
 启动后包含：
 
@@ -396,7 +395,7 @@ ros2 run navflex_bringup publish_geojson_marker_array.py --ros-args \
 
 ## 行为树和 FollowPath 容差
 
-Navflex 使用自定义 `NavflexExePathAction` 调用 `/follow_path`。`FollowPath.action` 支持：
+Navflex 使用自定义 `NavflexExePathAction`，默认调用 `/costmap/follow_path`。`FollowPath.action` 支持：
 
 - `xy_goal_tolerance`
 - `yaw_goal_tolerance`
@@ -408,7 +407,7 @@ Navflex 使用自定义 `NavflexExePathAction` 调用 `/follow_path`。`FollowPa
 
 控制器内部仍使用 `nav2_core::GoalChecker`。每个新的 FollowPath goal 会根据 action goal 的容差生成对应的 goal checker。同 controller、同 resolved 容差的新 path 会原地更新，不重启控制器；容差变化时才重建 goal checker 和 controller execution。
 
-调试 `/follow_path` 时，日志会打印 path 起点和终点的 `(x, y, yaw)` 以及最终使用的容差，便于确认行为树传入的目标姿态和参数默认值是否符合预期。
+调试 `/costmap/follow_path` 时，日志会打印 path 起点和终点的 `(x, y, yaw)` 以及最终使用的容差，便于确认行为树传入的目标姿态和参数默认值是否符合预期。
 
 ## 常用检查命令
 

@@ -123,7 +123,7 @@ private:
  *
  * BT XML example:
  * @code{.xml}
- *   <NavflexCancelGetPath server_name="compute_path_to_pose"/>
+ *   <NavflexCancelGetPath server_name="/costmap/compute_path_to_pose"/>
  * @endcode
  */
 class CancelGetPathAction

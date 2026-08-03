@@ -9,7 +9,7 @@
           outcome="{planner_outcome}"
           path="{path}"
           planner_id="RogAStar"
-          server_name="compute_path_to_pose"
+          server_name="/rogmap/compute_path_to_pose"
           server_timeout="1000"
           tolerance="0.5"
           use_start="false"/>
@@ -26,7 +26,7 @@
         message="{controller_message}"
         outcome="{controller_outcome}"
         path="{path}"
-        server_name="follow_path"
+        server_name="/rogmap/follow_path"
         server_timeout="1000"
         xy_goal_tolerance="0.0"
         yaw_goal_tolerance="0.0"/>

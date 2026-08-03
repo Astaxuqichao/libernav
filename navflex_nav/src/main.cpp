@@ -17,18 +17,19 @@ int main(int argc, char ** argv)
   const std::string navigation_type = selector->get_parameter("navigation_type").as_string();
   selector.reset();
 
-  rclcpp::NodeOptions options;
-  options.arguments({"--ros-args", "-r", "__node:=navflex_nav"});
+  rclcpp::NodeOptions costmap_options;
+  costmap_options.arguments(
+    {"--ros-args", "-r", "__node:=navflex_nav", "-r", "__ns:=/costmap"});
+  rclcpp::NodeOptions rogmap_options;
+  rogmap_options.arguments(
+    {"--ros-args", "-r", "__node:=navflex_nav", "-r", "__ns:=/rogmap"});
   std::vector<std::shared_ptr<nav2_util::LifecycleNode>> navigation_nodes;
   if (navigation_type == "costmap") {
-    navigation_nodes.push_back(std::make_shared<navflex_nav::CostmapNavNode>(options));
+    navigation_nodes.push_back(std::make_shared<navflex_nav::CostmapNavNode>(costmap_options));
   } else if (navigation_type == "rogmap") {
-    navigation_nodes.push_back(std::make_shared<navflex_nav::RogMapNavNode>(options));
+    navigation_nodes.push_back(std::make_shared<navflex_nav::RogMapNavNode>(rogmap_options));
   } else if (navigation_type == "both") {
-    navigation_nodes.push_back(std::make_shared<navflex_nav::CostmapNavNode>(options));
-    rclcpp::NodeOptions rogmap_options;
-    rogmap_options.arguments(
-      {"--ros-args", "-r", "__node:=navflex_nav", "-r", "__ns:=/rogmap"});
+    navigation_nodes.push_back(std::make_shared<navflex_nav::CostmapNavNode>(costmap_options));
     navigation_nodes.push_back(std::make_shared<navflex_nav::RogMapNavNode>(rogmap_options));
   } else {
     RCLCPP_FATAL(

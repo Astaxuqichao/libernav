@@ -144,7 +144,7 @@ BT_REGISTER_NODES(factory)
       [](const std::string & name, const BT::NodeConfiguration & config)
       {
         return std::make_unique<navflex_bt_nodes::ExePathAction>(
-          name, "follow_path", config);
+          name, "/costmap/follow_path", config);
       };
     factory.registerBuilder<navflex_bt_nodes::ExePathAction>(
       "NavflexExePathAction", builder);
@@ -156,7 +156,7 @@ BT_REGISTER_NODES(factory)
       [](const std::string & name, const BT::NodeConfiguration & config)
       {
         return std::make_unique<navflex_bt_nodes::CancelExePathAction>(
-          name, "follow_path", config);
+          name, "/costmap/follow_path", config);
       };
     factory.registerBuilder<navflex_bt_nodes::CancelExePathAction>(
       "NavflexCancelExePath", builder);

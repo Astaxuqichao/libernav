@@ -12,7 +12,7 @@ CheckPointService::CheckPointService(
   const std::string & service_node_name,
   const BT::NodeConfiguration & conf)
 : nav2_behavior_tree::BtServiceNode<nav2_msgs::srv::CheckPoint>(
-    service_node_name, conf, "check_point_cost")
+    service_node_name, conf, "/costmap/check_point_cost")
 {
 }
 
@@ -34,7 +34,7 @@ CheckPoseService::CheckPoseService(
   const std::string & service_node_name,
   const BT::NodeConfiguration & conf)
 : nav2_behavior_tree::BtServiceNode<nav2_msgs::srv::CheckPose>(
-    service_node_name, conf, "check_pose_cost")
+    service_node_name, conf, "/costmap/check_pose_cost")
 {
 }
 
@@ -61,7 +61,7 @@ CheckPathService::CheckPathService(
   const std::string & service_node_name,
   const BT::NodeConfiguration & conf)
 : nav2_behavior_tree::BtServiceNode<nav2_msgs::srv::CheckPath>(
-    service_node_name, conf, "check_path_cost")
+    service_node_name, conf, "/costmap/check_path_cost")
 {
 }
 

@@ -103,7 +103,7 @@ BT_REGISTER_NODES(factory)
       [](const std::string & name, const BT::NodeConfiguration & config)
       {
         return std::make_unique<navflex_bt_nodes::GetPathAction>(
-          name, "compute_path_to_pose", config);
+          name, "/costmap/compute_path_to_pose", config);
       };
     factory.registerBuilder<navflex_bt_nodes::GetPathAction>(
       "NavflexGetPathAction", builder);
@@ -115,7 +115,7 @@ BT_REGISTER_NODES(factory)
       [](const std::string & name, const BT::NodeConfiguration & config)
       {
         return std::make_unique<navflex_bt_nodes::CancelGetPathAction>(
-          name, "compute_path_to_pose", config);
+          name, "/costmap/compute_path_to_pose", config);
       };
     factory.registerBuilder<navflex_bt_nodes::CancelGetPathAction>(
       "NavflexCancelGetPath", builder);

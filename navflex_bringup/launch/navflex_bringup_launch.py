@@ -15,7 +15,6 @@ def launch_setup(context, *args, **kwargs):
     bt_dir = get_package_share_directory('navflex_bt_navigator')
     nav2_route_dir = get_package_share_directory('nav2_route')
 
-    namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
     autostart = LaunchConfiguration('autostart')
     chassis_model = LaunchConfiguration('chassis_model')
@@ -81,13 +80,15 @@ def launch_setup(context, *args, **kwargs):
     else:
         rogmap_params_file = rogmap_params_file or default_rogmap_params
 
-    lifecycle_nodes = ['navflex_nav']
-    if selected_navigation_type == 'both':
+    lifecycle_nodes = []
+    if selected_navigation_type in ('costmap', 'both'):
+        lifecycle_nodes.append('costmap/navflex_nav')
+    if selected_navigation_type in ('rogmap', 'both'):
         lifecycle_nodes.append('rogmap/navflex_nav')
     if with_route:
         lifecycle_nodes.append('route_server')
     if selected_navigation_type in ('costmap', 'both'):
-        lifecycle_nodes.append('velocity_smoother')
+        lifecycle_nodes.append('costmap/velocity_smoother')
     if with_bt_navigator:
         lifecycle_nodes.append('bt_navigator')
 
@@ -105,11 +106,8 @@ def launch_setup(context, *args, **kwargs):
                 convert_types=True),
             allow_substs=True)
 
-    configured_costmap_params = configured(costmap_params_file, namespace)
-    configured_rogmap_params = (
-        configured(rogmap_params_file, 'rogmap')
-        if selected_navigation_type == 'both'
-        else configured(rogmap_params_file, namespace))
+    configured_costmap_params = configured(costmap_params_file, 'costmap')
+    configured_rogmap_params = configured(rogmap_params_file, 'rogmap')
 
     selected_backend_params = []
     if selected_navigation_type in ('costmap', 'both'):
@@ -122,6 +120,7 @@ def launch_setup(context, *args, **kwargs):
         composable_nodes.append(ComposableNode(
             package='navflex_nav',
             plugin='navflex_nav::CostmapNavNode',
+            namespace='costmap',
             name='navflex_nav',
             parameters=[
                 {'use_sim_time': use_sim_time},
@@ -136,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
         composable_nodes.append(ComposableNode(
             package='navflex_nav',
             plugin='navflex_nav::RogMapNavNode',
-            namespace='rogmap' if selected_navigation_type == 'both' else '',
+            namespace='rogmap',
             name='navflex_nav',
             parameters=[
                 {'use_sim_time': use_sim_time},
@@ -152,12 +151,13 @@ def launch_setup(context, *args, **kwargs):
         composable_nodes.append(ComposableNode(
             package='nav2_velocity_smoother',
             plugin='nav2_velocity_smoother::VelocitySmoother',
+            namespace='costmap',
             name='velocity_smoother',
             parameters=[configured_costmap_params],
             extra_arguments=[
                 {'use_intra_process_comms': use_intra_process_comms},
             ],
-            remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', 'cmd_vel')]))
+            remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]))
 
     if with_bt_navigator:
         composable_nodes.append(ComposableNode(
@@ -265,11 +265,12 @@ def launch_setup(context, *args, **kwargs):
                 else IfCondition('false')),
             package='nav2_velocity_smoother',
             executable='velocity_smoother',
+            namespace='costmap',
             name='velocity_smoother',
             output='screen',
             parameters=[configured_costmap_params],
             arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', 'cmd_vel')]),
+            remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]),
 
         Node(
             condition=UnlessCondition(use_composition),
@@ -299,7 +300,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
-        DeclareLaunchArgument('namespace', default_value='', description='Top-level namespace'),
         DeclareLaunchArgument('use_sim_time', default_value='true', description='Use simulation clock'),
         DeclareLaunchArgument('chassis_model', default_value='omni',
                               description='Chassis model selecting navigation parameters: omni or diff'),

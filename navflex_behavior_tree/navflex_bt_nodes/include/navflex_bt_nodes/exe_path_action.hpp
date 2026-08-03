@@ -31,7 +31,7 @@ namespace navflex_bt_nodes
  *        (nav2_msgs::action::FollowPath).
  *
  * Mirrors the ControllerAction / ControllerCostmapServer in navflex_costmap_nav.
- * The server name "follow_path" matches the string registered in
+ * The default server name "/costmap/follow_path" matches the action registered in
  * ControllerCostmapServer (name_action_follow_path_).
  *
  * BT node ID: NavflexExePathAction
@@ -156,7 +156,7 @@ private:
  *
  * BT XML example:
  * @code{.xml}
- *   <NavflexCancelExePath server_name="follow_path"/>
+ *   <NavflexCancelExePath server_name="/costmap/follow_path"/>
  * @endcode
  */
 class CancelExePathAction
