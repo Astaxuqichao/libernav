@@ -122,7 +122,7 @@ source install/setup.bash
 - `use_sim_time:=true`
 - `chassis_model:=omni`
 - `navigation_type:=costmap`
-- `params_file` 为空时按 `chassis_model` 自动选择参数文件
+- `costmap_params_file` 为空时按 `chassis_model` 自动选择参数文件
 
 默认启动使用 Nav2 local/global costmap，不创建 ROGMap。需要显式切换到
 ROGMap 时使用：
@@ -146,6 +146,20 @@ ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=both
 
 两套 controller 的速度输出相互隔离。接入真实底盘时应通过速度 mux 或等价
 仲裁机制选择当前后端，不要将两个输出同时直连底盘。
+
+两类导航参数彼此独立：costmap 默认读取 `params/nav2_params.yaml`（差速底盘
+读取 `nav2_params_tb3_diff.yaml`），ROGMap 默认读取
+`params/rogmap_params.yaml`。双模式下可分别覆盖：
+
+```bash
+ros2 launch navflex_bringup navflex_bringup_launch.py \
+  navigation_type:=both \
+  costmap_params_file:=/path/to/costmap.yaml \
+  rogmap_params_file:=/path/to/rogmap.yaml
+```
+
+旧参数 `params_file` 继续兼容：单后端模式下覆盖当前后端，双后端模式下仅
+覆盖 costmap；新配置应优先使用两个专用参数。
 
 底盘参数选择：
 
@@ -309,7 +323,9 @@ ros2 launch navflex_bringup navflex_bringup_launch.py
 | --- | --- | --- |
 | `use_sim_time` | `true` | 使用仿真时间 |
 | `chassis_model` | `omni` | `omni` 或 `diff` |
-| `params_file` | empty | 自定义参数文件；为空时按底盘模型选择 |
+| `costmap_params_file` | empty | Costmap 参数；为空时按底盘模型选择 |
+| `rogmap_params_file` | empty | ROGMap 参数；为空时使用 `rogmap_params.yaml` |
+| `params_file` | empty | 兼容参数；覆盖当前单后端，双模式下覆盖 costmap |
 | `bt_params_file` | `navflex_bt_navigator/params/navflex_bt_navigator.yaml` | BT Navigator 参数 |
 | `default_nav_to_pose_bt_xml` | `navflex_bt_navigator/behavior_trees/test_bt_navigator.xml` | 默认行为树 |
 | `autostart` | `true` | 自动激活 lifecycle 节点 |

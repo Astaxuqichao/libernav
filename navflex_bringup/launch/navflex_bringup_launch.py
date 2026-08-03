@@ -42,7 +42,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(
             f'Unsupported navigation_type "{selected_navigation_type}". '
             'Expected "costmap", "rogmap", or "both".')
-    params_file = params_file_arg.perform(context)
+    legacy_params_file = params_file_arg.perform(context)
     bt_xml = bt_xml_arg.perform(context)
 
     if not bt_xml:
@@ -66,14 +66,20 @@ def launch_setup(context, *args, **kwargs):
 
     costmap_params_file = costmap_params_file_arg.perform(context)
     rogmap_params_file = rogmap_params_file_arg.perform(context)
-    if selected_navigation_type == 'both':
-        costmap_params_file = costmap_params_file or params_file or default_costmap_params
-        rogmap_params_file = rogmap_params_file or default_rogmap_params
-        params_file = costmap_params_file
-    elif selected_navigation_type == 'costmap':
-        params_file = params_file or costmap_params_file or default_costmap_params
+
+    # Keep params_file as a compatibility override for the selected single
+    # backend. In dual mode it retains its historical costmap meaning.
+    if selected_navigation_type in ('costmap', 'both'):
+        costmap_params_file = (
+            costmap_params_file or legacy_params_file or default_costmap_params)
     else:
-        params_file = params_file or rogmap_params_file or default_rogmap_params
+        costmap_params_file = costmap_params_file or default_costmap_params
+
+    if selected_navigation_type == 'rogmap':
+        rogmap_params_file = (
+            rogmap_params_file or legacy_params_file or default_rogmap_params)
+    else:
+        rogmap_params_file = rogmap_params_file or default_rogmap_params
 
     lifecycle_nodes = ['navflex_nav']
     if selected_navigation_type == 'both':
@@ -99,13 +105,17 @@ def launch_setup(context, *args, **kwargs):
                 convert_types=True),
             allow_substs=True)
 
-    configured_params = configured(params_file, namespace)
-    configured_costmap_params = (
-        configured(costmap_params_file, namespace)
-        if selected_navigation_type == 'both' else configured_params)
+    configured_costmap_params = configured(costmap_params_file, namespace)
     configured_rogmap_params = (
         configured(rogmap_params_file, 'rogmap')
-        if selected_navigation_type == 'both' else configured_params)
+        if selected_navigation_type == 'both'
+        else configured(rogmap_params_file, namespace))
+
+    selected_backend_params = []
+    if selected_navigation_type in ('costmap', 'both'):
+        selected_backend_params.append(configured_costmap_params)
+    if selected_navigation_type in ('rogmap', 'both'):
+        selected_backend_params.append(configured_rogmap_params)
 
     composable_nodes = []
     if selected_navigation_type in ('costmap', 'both'):
@@ -174,8 +184,7 @@ def launch_setup(context, *args, **kwargs):
             respawn_delay=2.0,
             parameters=[
                 {'use_sim_time': use_sim_time},
-                configured_costmap_params,
-                configured_rogmap_params,
+                *selected_backend_params,
                 {'navigation_type': navigation_type},
             ],
             arguments=['--ros-args', '--log-level', log_level],
@@ -187,7 +196,7 @@ def launch_setup(context, *args, **kwargs):
             executable='component_container_isolated',
             name=container_name,
             output='screen',
-            parameters=[configured_costmap_params, configured_rogmap_params],
+            parameters=selected_backend_params,
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings),
 
@@ -297,11 +306,11 @@ def generate_launch_description():
         DeclareLaunchArgument('navigation_type', default_value='costmap',
                               description='Navigation backend: costmap, rogmap, or both'),
         DeclareLaunchArgument('params_file', default_value='',
-                              description='Optional parameter file override. Empty selects by navigation type'),
+                              description='Legacy selected-backend parameter override'),
         DeclareLaunchArgument('costmap_params_file', default_value='',
-                              description='Costmap parameters used by navigation_type=both'),
+                              description='Costmap backend parameters'),
         DeclareLaunchArgument('rogmap_params_file', default_value='',
-                              description='ROGMap parameters used by navigation_type=both'),
+                              description='ROGMap backend parameters'),
         DeclareLaunchArgument('bt_params_file', default_value=default_bt_params_file,
                               description='Full path to the bt_navigator parameters file'),
         DeclareLaunchArgument('default_nav_to_pose_bt_xml', default_value='',
