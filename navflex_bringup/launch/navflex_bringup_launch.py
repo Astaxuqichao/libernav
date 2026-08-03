@@ -88,7 +88,9 @@ def launch_setup(context, *args, **kwargs):
     if with_route:
         lifecycle_nodes.append('route_server')
     if selected_navigation_type in ('costmap', 'both'):
-        lifecycle_nodes.append('costmap/velocity_smoother')
+        # velocity_smoother is shared with the robot base, so keep it outside
+        # either navigation backend namespace.
+        lifecycle_nodes.append('velocity_smoother')
     if with_bt_navigator:
         lifecycle_nodes.append('bt_navigator')
 
@@ -108,6 +110,15 @@ def launch_setup(context, *args, **kwargs):
 
     configured_costmap_params = configured(costmap_params_file, 'costmap')
     configured_rogmap_params = configured(rogmap_params_file, 'rogmap')
+    configured_velocity_params = ParameterFile(
+        RewrittenYaml(
+            source_file=costmap_params_file,
+            param_rewrites={
+                'use_sim_time': use_sim_time,
+                'autostart': autostart,
+            },
+            convert_types=True),
+        allow_substs=True)
 
     selected_backend_params = []
     if selected_navigation_type in ('costmap', 'both'):
@@ -151,13 +162,12 @@ def launch_setup(context, *args, **kwargs):
         composable_nodes.append(ComposableNode(
             package='nav2_velocity_smoother',
             plugin='nav2_velocity_smoother::VelocitySmoother',
-            namespace='costmap',
             name='velocity_smoother',
-            parameters=[configured_costmap_params],
+            parameters=[configured_velocity_params],
             extra_arguments=[
                 {'use_intra_process_comms': use_intra_process_comms},
             ],
-            remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]))
+            remappings=remappings + [('cmd_vel', '/costmap/cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]))
 
     if with_bt_navigator:
         composable_nodes.append(ComposableNode(
@@ -265,12 +275,11 @@ def launch_setup(context, *args, **kwargs):
                 else IfCondition('false')),
             package='nav2_velocity_smoother',
             executable='velocity_smoother',
-            namespace='costmap',
             name='velocity_smoother',
             output='screen',
-            parameters=[configured_costmap_params],
+            parameters=[configured_velocity_params],
             arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings + [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]),
+            remappings=remappings + [('cmd_vel', '/costmap/cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]),
 
         Node(
             condition=UnlessCondition(use_composition),

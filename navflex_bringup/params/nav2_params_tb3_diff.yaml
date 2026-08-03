@@ -1,3 +1,9 @@
+navflex_nav:
+  ros__parameters:
+    global_frame: map
+    robot_frame: base_link
+    odom_topic: /odom
+
 navflex_controller_server:
   ros__parameters:
     use_sim_time: True
@@ -301,6 +307,7 @@ global_costmap:
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
+        map_topic: /map
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
@@ -432,7 +439,7 @@ velocity_smoother:
     min_velocity: [-0.10, 0.0, -1.82]
     max_accel: [1.0, 0.0, 4.0]
     max_decel: [-1.0, 0.0, -4.0]
-    odom_topic: "odom"
+    odom_topic: "/odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0

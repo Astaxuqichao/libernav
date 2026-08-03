@@ -5,7 +5,7 @@ navflex_nav:
     tf_timeout: 0.5
     global_frame: map
     robot_frame: base_link
-    odom_topic: odom
+    odom_topic: /odom
 
 rog_map:
   rog_map:
@@ -110,7 +110,7 @@ navflex_controller_server:
     default_yaw_goal_tolerance: 0.2
     # Both navigation backends ultimately command the same robot base.
     cmd_vel_topic: /cmd_vel
-    speed_limit_topic: speed_limit
+    speed_limit_topic: /speed_limit
     ScanController:
       plugin: scan_planner/ScanController
       footprint_type: sphere
