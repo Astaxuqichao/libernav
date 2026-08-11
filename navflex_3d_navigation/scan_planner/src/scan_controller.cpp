@@ -71,8 +71,20 @@ void ScanController::configure(
   declare("rear_sphere_radius", 0.3);
   declare("footprint_safety_margin", 0.0);
   declare("robot_frame", std::string("base_link"));
-  declare("planning_horizon", 5.0);
+  declare("trajectory_topic", std::string("scan_planner/optimized_path"));
   declare("sample_distance", 0.1);
+  declare("control_point_distance", 0.2);
+  declare("astar_resolution", 0.15);
+  declare("astar_search_margin", 2.0);
+  declare("astar_max_expansions", 30000);
+  declare("optimization_iterations", 60);
+  declare("optimization_step_size", 0.08);
+  declare("lambda_smooth", 1.0);
+  declare("lambda_collision", 1.0);
+  declare("lambda_reference", 1.0);
+  declare("lambda_feasibility", 0.1);
+  declare("collision_distance", 0.2);
+  declare("max_reference_deviation", 1.5);
   declare("lookahead_time", 0.8);
   declare("control_lookahead_time", 0.15);
   declare("max_velocity", 0.8);
@@ -81,6 +93,7 @@ void ScanController::configure(
   declare("max_yaw_rate", 1.0);
   declare("kp_position", 1.5);
   declare("kp_yaw", 2.0);
+  declare("heading_error_threshold", 0.8);
   declare("min_yaw_control_speed", 0.05);
 
   footprint_.type = navflex_rog_map::footprintTypeFromString(
@@ -117,8 +130,23 @@ void ScanController::configure(
   footprint_.safety_margin =
     node_->get_parameter(name_ + ".footprint_safety_margin").as_double();
   navflex_rog_map::validateFootprint(footprint_);
-  node_->get_parameter(name_ + ".planning_horizon", planning_horizon_);
-  node_->get_parameter(name_ + ".sample_distance", sample_distance_);
+  node_->get_parameter(name_ + ".sample_distance", planner_config_.sample_distance);
+  node_->get_parameter(
+    name_ + ".control_point_distance", planner_config_.control_point_distance);
+  node_->get_parameter(name_ + ".astar_resolution", planner_config_.astar_resolution);
+  node_->get_parameter(name_ + ".astar_search_margin", planner_config_.astar_search_margin);
+  node_->get_parameter(name_ + ".astar_max_expansions", planner_config_.astar_max_expansions);
+  node_->get_parameter(
+    name_ + ".optimization_iterations", planner_config_.optimization_iterations);
+  node_->get_parameter(
+    name_ + ".optimization_step_size", planner_config_.optimization_step_size);
+  node_->get_parameter(name_ + ".lambda_smooth", planner_config_.smooth_weight);
+  node_->get_parameter(name_ + ".lambda_collision", planner_config_.collision_weight);
+  node_->get_parameter(name_ + ".lambda_reference", planner_config_.reference_weight);
+  node_->get_parameter(name_ + ".lambda_feasibility", planner_config_.feasibility_weight);
+  node_->get_parameter(name_ + ".collision_distance", planner_config_.collision_distance);
+  node_->get_parameter(
+    name_ + ".max_reference_deviation", planner_config_.max_reference_deviation);
   node_->get_parameter(name_ + ".lookahead_time", lookahead_time_);
   node_->get_parameter(name_ + ".control_lookahead_time", control_lookahead_time_);
   node_->get_parameter(name_ + ".max_velocity", max_velocity_);
@@ -127,16 +155,32 @@ void ScanController::configure(
   node_->get_parameter(name_ + ".max_yaw_rate", max_yaw_rate_);
   node_->get_parameter(name_ + ".kp_position", position_gain_);
   node_->get_parameter(name_ + ".kp_yaw", yaw_gain_);
+  node_->get_parameter(name_ + ".heading_error_threshold", heading_error_threshold_);
   node_->get_parameter(name_ + ".robot_frame", robot_frame_);
+  node_->get_parameter(name_ + ".trajectory_topic", trajectory_topic_);
   node_->get_parameter(name_ + ".min_yaw_control_speed", min_yaw_control_speed_);
-  if (planning_horizon_ <= 0.0 || sample_distance_ <= 0.0 || max_velocity_ <= 0.0 ||
+  planner_config_.max_velocity = max_velocity_;
+  planner_config_.max_acceleration = max_acceleration_;
+  if (planner_config_.sample_distance <= 0.0 ||
+    planner_config_.control_point_distance <= 0.0 ||
+    planner_config_.astar_resolution <= 0.0 || planner_config_.astar_search_margin < 0.0 ||
+    planner_config_.astar_max_expansions <= 0 || planner_config_.optimization_iterations < 0 ||
+    planner_config_.optimization_step_size <= 0.0 ||
+    planner_config_.smooth_weight < 0.0 || planner_config_.collision_weight < 0.0 ||
+    planner_config_.reference_weight < 0.0 || planner_config_.feasibility_weight < 0.0 ||
+    planner_config_.collision_distance < 0.0 ||
+    planner_config_.max_reference_deviation < 0.0 || max_velocity_ <= 0.0 ||
     max_vertical_velocity_ < 0.0 || max_acceleration_ <= 0.0 || max_yaw_rate_ < 0.0 ||
     lookahead_time_ < 0.0 || control_lookahead_time_ < 0.0 ||
-    control_lookahead_time_ > lookahead_time_ || min_yaw_control_speed_ < 0.0 ||
-    robot_frame_.empty())
+    control_lookahead_time_ > lookahead_time_ || heading_error_threshold_ < 0.0 ||
+    min_yaw_control_speed_ < 0.0 ||
+    robot_frame_.empty() || trajectory_topic_.empty())
   {
     throw std::invalid_argument("Invalid ScanController motion or frame parameters");
   }
+  planner_ = std::make_unique<SingleScanPlanner>(planner_config_, map_, footprint_);
+  trajectory_publisher_ = node_->create_publisher<nav_msgs::msg::Path>(
+    trajectory_topic_, rclcpp::QoS(1).transient_local());
   last_time_ = node_->now();
 }
 
@@ -144,9 +188,11 @@ void ScanController::cleanup()
 {
   std::lock_guard<std::mutex> lock(mutex_);
   active_ = false;
-  local_trajectory_.clear();
+  planned_trajectory_ = TimedScanTrajectory();
   input_trajectory_ = navflex_rogmap_core::Trajectory3D();
   map_.reset();
+  planner_.reset();
+  trajectory_publisher_.reset();
   tf_.reset();
   node_.reset();
 }
@@ -156,6 +202,9 @@ void ScanController::activate()
   std::lock_guard<std::mutex> lock(mutex_);
   active_ = true;
   canceled_ = false;
+  if (trajectory_publisher_) {
+    trajectory_publisher_->on_activate();
+  }
   last_time_ = node_->now();
 }
 
@@ -163,14 +212,18 @@ void ScanController::deactivate()
 {
   std::lock_guard<std::mutex> lock(mutex_);
   active_ = false;
+  if (trajectory_publisher_) {
+    trajectory_publisher_->on_deactivate();
+  }
 }
 
 void ScanController::setTrajectory(const navflex_rogmap_core::Trajectory3D & trajectory)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   input_trajectory_ = trajectory;
-  local_trajectory_.clear();
+  planned_trajectory_ = TimedScanTrajectory();
   trajectory_time_ = 0.0;
+  trajectory_planned_ = false;
   canceled_ = false;
 }
 
@@ -184,18 +237,6 @@ bool ScanController::cancel()
 bool ScanController::occupied(const geometry_msgs::msg::Pose & pose) const
 {
   return !map_->isCollisionFree(pose, footprint_);
-}
-
-bool ScanController::clear(const Point & point) const
-{
-  double clearance = 0.0;
-  if (!map_->distanceAt(toMessage(point), clearance)) {
-    geometry_msgs::msg::Pose pose;
-    pose.position = toMessage(point);
-    pose.orientation.w = 1.0;
-    return map_->isCollisionFree(pose, footprint_);
-  }
-  return clearance >= footprint_.radius + footprint_.safety_margin;
 }
 
 bool ScanController::segmentFree(const Point & start, const Point & end) const
@@ -212,59 +253,36 @@ bool ScanController::segmentFree(const Point & start, const Point & end) const
   start_pose.orientation.z = orientation.z();
   start_pose.orientation.w = orientation.w();
   end_pose.orientation = start_pose.orientation;
-  return clear(start) && clear(end) && map_->raycastFree(start_pose, end_pose, footprint_);
-}
-
-std::vector<ScanController::Point> ScanController::buildLocalTrajectory(
-  const Point & current) const
-{
-  std::vector<Point> result{current};
-  double accumulated_distance = 0.0;
-  Point previous = current;
-  for (const auto & pose : input_trajectory_.path.poses) {
-    const Point candidate{
-      pose.pose.position.x, pose.pose.position.y, pose.pose.position.z};
-    const double step = distance(previous, candidate);
-    if (step < sample_distance_) {
-      continue;
-    }
-    if (!segmentFree(previous, candidate)) {
-      break;
-    }
-    result.push_back(candidate);
-    accumulated_distance += step;
-    previous = candidate;
-    if (accumulated_distance >= planning_horizon_) {
-      break;
-    }
-  }
-  return result.size() > 1 ? result : std::vector<Point>{};
+  return map_->raycastFree(start_pose, end_pose, footprint_);
 }
 
 ScanController::Point ScanController::evaluate(double time) const
 {
-  if (local_trajectory_.empty()) {
+  if (planned_trajectory_.points.empty()) {
     return {};
   }
-  double remaining = time * max_velocity_ * speed_scale_;
-  size_t index = 0;
-  while (index + 1 < local_trajectory_.size()) {
-    const double segment_length = distance(
-      local_trajectory_[index], local_trajectory_[index + 1]);
-    if (remaining <= segment_length) {
-      const double ratio = segment_length > 1e-6 ? remaining / segment_length : 0.0;
-      return {
-        local_trajectory_[index].x + ratio *
-        (local_trajectory_[index + 1].x - local_trajectory_[index].x),
-        local_trajectory_[index].y + ratio *
-        (local_trajectory_[index + 1].y - local_trajectory_[index].y),
-        local_trajectory_[index].z + ratio *
-        (local_trajectory_[index + 1].z - local_trajectory_[index].z)};
-    }
-    remaining -= segment_length;
-    ++index;
+  const double scaled_time = std::max(0.0, time * speed_scale_);
+  if (scaled_time >= planned_trajectory_.duration) {
+    return planned_trajectory_.points.back();
   }
-  return local_trajectory_.back();
+  const auto upper = std::upper_bound(
+    planned_trajectory_.times.begin(), planned_trajectory_.times.end(), scaled_time);
+  const size_t next = static_cast<size_t>(
+    std::distance(planned_trajectory_.times.begin(), upper));
+  if (next == 0 || next >= planned_trajectory_.points.size()) {
+    return planned_trajectory_.points[std::min(next, planned_trajectory_.points.size() - 1)];
+  }
+  const size_t previous = next - 1;
+  const double interval = planned_trajectory_.times[next] - planned_trajectory_.times[previous];
+  const double ratio = interval > 1e-9 ?
+    (scaled_time - planned_trajectory_.times[previous]) / interval : 0.0;
+  return {
+    planned_trajectory_.points[previous].x + ratio *
+    (planned_trajectory_.points[next].x - planned_trajectory_.points[previous].x),
+    planned_trajectory_.points[previous].y + ratio *
+    (planned_trajectory_.points[next].y - planned_trajectory_.points[previous].y),
+    planned_trajectory_.points[previous].z + ratio *
+    (planned_trajectory_.points[next].z - planned_trajectory_.points[previous].z)};
 }
 
 ScanController::Point ScanController::evaluateVelocity(double time) const
@@ -275,6 +293,35 @@ ScanController::Point ScanController::evaluateVelocity(double time) const
   return {(second.x - first.x) / kDerivativeStep,
     (second.y - first.y) / kDerivativeStep,
     (second.z - first.z) / kDerivativeStep};
+}
+
+void ScanController::publishPlannedTrajectory() const
+{
+  if (!trajectory_publisher_ || !trajectory_publisher_->is_activated()) {
+    return;
+  }
+  nav_msgs::msg::Path path;
+  path.header.stamp = node_->now();
+  path.header.frame_id = global_frame_;
+  path.poses.reserve(planned_trajectory_.points.size());
+  for (size_t i = 0; i < planned_trajectory_.points.size(); ++i) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header = path.header;
+    pose.pose.position = toMessage(planned_trajectory_.points[i]);
+    const size_t next = std::min(i + 1, planned_trajectory_.points.size() - 1);
+    const size_t previous = i > 0 ? i - 1 : i;
+    const double yaw = std::atan2(
+      planned_trajectory_.points[next].y - planned_trajectory_.points[previous].y,
+      planned_trajectory_.points[next].x - planned_trajectory_.points[previous].x);
+    tf2::Quaternion orientation;
+    orientation.setRPY(0.0, 0.0, yaw);
+    pose.pose.orientation.x = orientation.x();
+    pose.pose.orientation.y = orientation.y();
+    pose.pose.orientation.z = orientation.z();
+    pose.pose.orientation.w = orientation.w();
+    path.poses.push_back(std::move(pose));
+  }
+  trajectory_publisher_->publish(path);
 }
 
 uint32_t ScanController::computeVelocityCommands(
@@ -313,26 +360,30 @@ uint32_t ScanController::computeVelocityCommands(
     message = "Current robot position collides with the ROG map";
     return Result::BLOCKED_PATH;
   }
-  if (local_trajectory_.empty() ||
-    !segmentFree(current, evaluate(trajectory_time_ + lookahead_time_)))
-  {
-    local_trajectory_ = buildLocalTrajectory(current);
-    trajectory_time_ = 0.0;
-    if (local_trajectory_.empty()) {
-      message = "No collision-free local SCAN trajectory in the ROG map";
+  if (!trajectory_planned_) {
+    if (!planner_) {
+      message = "Single-shot SCAN planner is not configured";
+      return Result::NOT_INITIALIZED;
+    }
+    if (!planner_->plan(input_trajectory_.path, pose.pose, planned_trajectory_, message)) {
       return Result::BLOCKED_PATH;
     }
+    trajectory_time_ = 0.0;
+    trajectory_planned_ = true;
+    publishPlannedTrajectory();
+  }
+  if (!segmentFree(current, evaluate(trajectory_time_ + lookahead_time_))) {
+    message = "Single-shot SCAN trajectory became blocked; a new action goal is required";
+    return Result::BLOCKED_PATH;
   }
 
   const rclcpp::Time now = node_->now();
   const double time_step = clamp((now - last_time_).seconds(), 0.001, 0.1);
   last_time_ = now;
-  trajectory_time_ += time_step;
   const Point desired = evaluate(trajectory_time_ + control_lookahead_time_);
   const Point feed_forward = evaluateVelocity(trajectory_time_);
   double velocity_x = feed_forward.x + position_gain_ * (desired.x - current.x);
   double velocity_y = feed_forward.y + position_gain_ * (desired.y - current.y);
-  double velocity_z = feed_forward.z + position_gain_ * (desired.z - current.z);
 
   const double horizontal_limit = max_velocity_ * speed_scale_;
   const double horizontal_norm = std::hypot(velocity_x, velocity_y);
@@ -340,31 +391,43 @@ uint32_t ScanController::computeVelocityCommands(
     velocity_x *= horizontal_limit / horizontal_norm;
     velocity_y *= horizontal_limit / horizontal_norm;
   }
-  velocity_z = clamp(
-    velocity_z, -max_vertical_velocity_ * speed_scale_,
-    max_vertical_velocity_ * speed_scale_);
-  velocity_x = clamp(
-    velocity_x, velocity.linear.x - max_acceleration_ * time_step,
-    velocity.linear.x + max_acceleration_ * time_step);
-  velocity_y = clamp(
-    velocity_y, velocity.linear.y - max_acceleration_ * time_step,
-    velocity.linear.y + max_acceleration_ * time_step);
-  velocity_z = clamp(
-    velocity_z, velocity.linear.z - max_acceleration_ * time_step,
-    velocity.linear.z + max_acceleration_ * time_step);
 
+  // The trajectory and feedback terms above are expressed in the map frame,
+  // while the measured Twist is expressed in the robot frame.
   const double yaw = tf2::getYaw(pose.pose.orientation);
+  const double measured_velocity_x =
+    std::cos(yaw) * velocity.linear.x - std::sin(yaw) * velocity.linear.y;
+  const double measured_velocity_y =
+    std::sin(yaw) * velocity.linear.x + std::cos(yaw) * velocity.linear.y;
+  velocity_x = clamp(
+    velocity_x, measured_velocity_x - max_acceleration_ * time_step,
+    measured_velocity_x + max_acceleration_ * time_step);
+  velocity_y = clamp(
+    velocity_y, measured_velocity_y - max_acceleration_ * time_step,
+    measured_velocity_y + max_acceleration_ * time_step);
+
   const double horizontal_speed = std::hypot(velocity_x, velocity_y);
   const double desired_yaw = horizontal_speed >= min_yaw_control_speed_ ?
     std::atan2(velocity_y, velocity_x) : yaw;
   const double yaw_error = std::atan2(
     std::sin(desired_yaw - yaw), std::cos(desired_yaw - yaw));
+  if (std::abs(yaw_error) > heading_error_threshold_) {
+    command.twist.angular.z = clamp(
+      yaw_gain_ * yaw_error, -max_yaw_rate_, max_yaw_rate_);
+    message = "Rotating toward the single-shot SCAN trajectory";
+    return Result::SUCCESS;
+  }
+  trajectory_time_ = std::min(
+    planned_trajectory_.duration / std::max(speed_scale_, 1e-6),
+    trajectory_time_ + time_step);
   command.twist.linear.x = std::cos(yaw) * velocity_x + std::sin(yaw) * velocity_y;
   command.twist.linear.y = -std::sin(yaw) * velocity_x + std::cos(yaw) * velocity_y;
-  command.twist.linear.z = velocity_z;
+  // A quadruped follows body-height changes through contact with the terrain;
+  // cmd_vel.z is not a flight command. Z remains part of planning and collision checks.
+  command.twist.linear.z = 0.0;
   command.twist.angular.z = clamp(
     yaw_gain_ * yaw_error, -max_yaw_rate_, max_yaw_rate_);
-  message = "Tracking dynamically validated 3D SCAN trajectory using ROG map and ESDF";
+  message = "Tracking single-shot SCAN trajectory using ROG map and ESDF";
   return Result::SUCCESS;
 }
 

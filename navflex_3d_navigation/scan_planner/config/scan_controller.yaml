@@ -14,8 +14,20 @@ navflex_controller_server:
       rear_sphere_radius: 0.3
       footprint_safety_margin: 0.0
       robot_frame: base_link
-      planning_horizon: 5.0
+      trajectory_topic: scan_planner/optimized_path
       sample_distance: 0.1
+      control_point_distance: 0.2
+      astar_resolution: 0.15
+      astar_search_margin: 2.0
+      astar_max_expansions: 30000
+      optimization_iterations: 60
+      optimization_step_size: 0.08
+      lambda_smooth: 1.0
+      lambda_collision: 1.0
+      lambda_reference: 1.0
+      lambda_feasibility: 0.1
+      collision_distance: 0.2
+      max_reference_deviation: 1.5
       lookahead_time: 0.8
       control_lookahead_time: 0.15
       max_velocity: 0.8
@@ -24,4 +36,5 @@ navflex_controller_server:
       max_yaw_rate: 1.0
       kp_position: 1.5
       kp_yaw: 2.0
+      heading_error_threshold: 0.8
       min_yaw_control_speed: 0.05

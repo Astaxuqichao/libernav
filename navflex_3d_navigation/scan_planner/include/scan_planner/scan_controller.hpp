@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "navflex_rogmap_core/controller.hpp"
+#include "scan_planner/single_scan_planner.hpp"
 
 namespace scan_planner
 {
@@ -36,19 +37,13 @@ public:
   bool cancel() override;
 
 private:
-  struct Point
-  {
-    double x{0.0};
-    double y{0.0};
-    double z{0.0};
-  };
+  using Point = ScanPoint;
 
   bool occupied(const geometry_msgs::msg::Pose & pose) const;
   bool segmentFree(const Point & start, const Point & end) const;
-  bool clear(const Point & point) const;
-  std::vector<Point> buildLocalTrajectory(const Point & current) const;
   Point evaluate(double time) const;
   Point evaluateVelocity(double time) const;
+  void publishPlannedTrajectory() const;
   static geometry_msgs::msg::Point toMessage(const Point & point);
   static double distance(const Point & first, const Point & second);
   static double clamp(double value, double minimum, double maximum);
@@ -57,14 +52,16 @@ private:
   std::shared_ptr<tf2_ros::Buffer> tf_;
   navflex_rog_map::RogMap::ConstPtr map_;
   navflex_rogmap_core::Trajectory3D input_trajectory_;
-  std::vector<Point> local_trajectory_;
+  std::unique_ptr<SingleScanPlanner> planner_;
+  SingleScanPlannerConfig planner_config_;
+  TimedScanTrajectory planned_trajectory_;
   mutable std::mutex mutex_;
   std::string name_;
   std::string global_frame_;
   std::string robot_frame_{"base_link"};
+  std::string trajectory_topic_{"scan_planner/optimized_path"};
+  rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr trajectory_publisher_;
   navflex_rog_map::Footprint3D footprint_;
-  double planning_horizon_{5.0};
-  double sample_distance_{0.1};
   double lookahead_time_{0.8};
   double control_lookahead_time_{0.15};
   double max_velocity_{0.8};
@@ -73,12 +70,14 @@ private:
   double max_yaw_rate_{1.0};
   double position_gain_{1.5};
   double yaw_gain_{2.0};
+  double heading_error_threshold_{0.8};
   double min_yaw_control_speed_{0.05};
   double speed_scale_{1.0};
   double trajectory_time_{0.0};
   rclcpp::Time last_time_;
   bool active_{false};
   bool canceled_{false};
+  bool trajectory_planned_{false};
 };
 
 }  // namespace scan_planner

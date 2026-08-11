@@ -1,16 +1,31 @@
 # scan_planner
 
-Three-dimensional SCAN local controller implemented as a
-`navflex_rogmap_core::Controller` plugin.
+Single-shot SCAN local planner and controller implemented as a
+`navflex_rogmap_core::Controller` plugin. It is adapted to the NavFlex ROS 2
+plugin lifecycle from the main planning ideas in
+[SCAN-Planner](https://github.com/wuyi2121/SCAN-Planner), without its FSM.
 
-The controller consumes `RogMap::ConstPtr` directly. It does not subscribe to
-point clouds or maintain a duplicate voxel map. Local trajectory validation
-uses ROG-Map inflated occupancy, continuous 3D footprint checks, and ESDF
-distance queries. Supported footprint types are `sphere`, `cylinder`, `box`,
-and `double_sphere`. The double-sphere model uses independent front and rear
-sphere offsets and radii in the robot frame. Velocity output retains SCAN feed-forward tracking,
-position/yaw feedback, vertical velocity limits, acceleration limits, dynamic
-trajectory rebuilding, cancellation, and speed-limit support.
+The plugin consumes a RogAStar `nav_msgs/Path` as its reference and a shared
+`RogMap::ConstPtr` as its only obstacle map. On the first control cycle for a
+new path it performs one planning pass:
+
+1. prune the traversed prefix and resample reference control points;
+2. repair colliding portions with an XY A* search whose Z follows the local
+   reference segment, matching SCAN-Planner's cross-floor search constraint;
+3. optimize smoothness, collision clearance, reference fitness, and local
+   feasibility costs using ROG-Map ESDF gradients;
+4. sample a cubic B-spline and apply forward/backward velocity and acceleration
+   time parameterization.
+
+Execution uses feed-forward plus position/yaw feedback, heading-first rotation,
+acceleration limiting, cancellation, and speed limits. It continuously validates
+the planned lookahead against ROG-Map, but deliberately does not replan. If the
+trajectory becomes blocked, the current action fails and a new goal is required.
+For quadrupeds, path Z participates in planning and collision checking but is not
+published as `cmd_vel.linear.z`.
+
+Supported ROG-Map footprint types are `sphere`, `cylinder`, `box`, and
+`double_sphere`.
 
 Plugin type:
 

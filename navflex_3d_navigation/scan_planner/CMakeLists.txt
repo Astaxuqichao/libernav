@@ -6,6 +6,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav2_util REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(navflex_rog_map REQUIRED)
 find_package(navflex_rogmap_core REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -14,13 +15,15 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-add_library(scan_controller SHARED src/scan_controller.cpp)
+add_library(scan_controller SHARED
+  src/scan_controller.cpp
+  src/single_scan_planner.cpp)
 target_include_directories(scan_controller PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(scan_controller PUBLIC cxx_std_17)
 ament_target_dependencies(scan_controller
-  geometry_msgs nav2_core nav2_msgs nav2_util navflex_rog_map
+  geometry_msgs nav2_core nav2_msgs nav2_util nav_msgs navflex_rog_map
   navflex_rogmap_core pluginlib rclcpp rclcpp_lifecycle tf2 tf2_ros)
 pluginlib_export_plugin_description_file(navflex_rogmap_core controller_plugin.xml)
 
@@ -31,11 +34,15 @@ install(FILES controller_plugin.xml DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_uncrustify REQUIRED)
   ament_uncrustify(LANGUAGE CPP include src)
+  ament_add_gtest(test_single_scan_planner test/test_single_scan_planner.cpp)
+  target_link_libraries(test_single_scan_planner scan_controller)
+  ament_target_dependencies(test_single_scan_planner geometry_msgs nav_msgs navflex_rog_map)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(navflex_rogmap_core)
+ament_export_dependencies(nav_msgs navflex_rog_map navflex_rogmap_core)
 ament_package()
