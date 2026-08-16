@@ -24,12 +24,16 @@
   <depend>tf2_ros</depend>
   <depend>visualization_msgs</depend>
   <depend>navflex_bt_navigator</depend>
+  <depend>navflex_rogmap_bt_navigator</depend>
   <depend>navflex_nav</depend>
   <depend>omni_fake_node</depend>
   <depend>simulation_lidar</depend>
-  <depend>scan_planner</depend>
+  <depend>navflex_scan_planner</depend>
   <depend>navflex_rogmap_planner</depend>
   <depend>navflex_frontier_planner</depend>
+  <depend>navflex_3d_pcd_simulator</depend>
+  <exec_depend>navflex_rviz_plugins</exec_depend>
+  <exec_depend>rviz2</exec_depend>
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>gazebo_ros</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>

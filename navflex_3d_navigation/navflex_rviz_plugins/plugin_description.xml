@@ -1,0 +1,8 @@
+<library path="navflex_3d_goal_panel">
+  <class
+    name="navflex_rviz_plugins/Goal3DPanel"
+    type="navflex_rviz_plugins::Goal3DPanel"
+    base_class_type="rviz_common::Panel">
+    <description>Manual three-dimensional navigation goal input for Navflex.</description>
+  </class>
+</library>

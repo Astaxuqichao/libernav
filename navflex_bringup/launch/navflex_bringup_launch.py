@@ -12,7 +12,7 @@ from nav2_common.launch import RewrittenYaml
 
 def launch_setup(context, *args, **kwargs):
     bringup_dir = get_package_share_directory('navflex_bringup')
-    bt_dir = get_package_share_directory('navflex_bt_navigator')
+    bt_dir = get_package_share_directory('navflex_rogmap_bt_navigator')
     nav2_route_dir = get_package_share_directory('nav2_route')
 
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -21,6 +21,7 @@ def launch_setup(context, *args, **kwargs):
     params_file_arg = LaunchConfiguration('params_file')
     costmap_params_file_arg = LaunchConfiguration('costmap_params_file')
     rogmap_params_file_arg = LaunchConfiguration('rogmap_params_file')
+    rogmap_pcd_file_arg = LaunchConfiguration('rogmap_pcd_file')
     bt_params_file = LaunchConfiguration('bt_params_file')
     bt_xml_arg = LaunchConfiguration('default_nav_to_pose_bt_xml')
     use_respawn = LaunchConfiguration('use_respawn')
@@ -34,9 +35,11 @@ def launch_setup(context, *args, **kwargs):
     navigation_type = LaunchConfiguration('navigation_type')
 
     with_route = use_route_server.perform(context).lower() in ('true', '1', 'yes')
-    with_bt_navigator = use_bt_navigator.perform(context).lower() in ('true', '1', 'yes')
-    selected_chassis = chassis_model.perform(context).lower()
     selected_navigation_type = navigation_type.perform(context).lower()
+    with_bt_navigator = (
+        use_bt_navigator.perform(context).lower() in ('true', '1', 'yes') and
+        selected_navigation_type in ('rogmap', 'both'))
+    selected_chassis = chassis_model.perform(context).lower()
     if selected_navigation_type not in ('costmap', 'rogmap', 'both'):
         raise ValueError(
             f'Unsupported navigation_type "{selected_navigation_type}". '
@@ -46,11 +49,7 @@ def launch_setup(context, *args, **kwargs):
 
     if not bt_xml:
         bt_xml = os.path.join(
-            bt_dir,
-            'behavior_trees',
-            'navigate_to_pose_rogmap.xml'
-            if selected_navigation_type == 'rogmap'
-            else 'test_bt_navigator.xml')
+            bt_dir, 'behavior_trees', 'navigate_to_pose_rogmap.xml')
 
     if selected_chassis == 'omni':
         default_costmap_params = os.path.join(bringup_dir, 'params', 'nav2_params.yaml')
@@ -62,9 +61,12 @@ def launch_setup(context, *args, **kwargs):
             f'Unsupported chassis_model "{selected_chassis}". '
             'Expected "omni" or "diff".')
     default_rogmap_params = os.path.join(bringup_dir, 'params', 'rogmap_params.yaml')
+    default_rogmap_pcd_file = os.path.join(
+        bringup_dir, 'maps', 'multilevel_ramp_stairs_0p1m.pcd')
 
     costmap_params_file = costmap_params_file_arg.perform(context)
     rogmap_params_file = rogmap_params_file_arg.perform(context)
+    rogmap_pcd_file = rogmap_pcd_file_arg.perform(context) or default_rogmap_pcd_file
 
     # Keep params_file as a compatibility override for the selected single
     # backend. In dual mode it retains its historical costmap meaning.
@@ -92,24 +94,29 @@ def launch_setup(context, *args, **kwargs):
         # either navigation backend namespace.
         lifecycle_nodes.append('velocity_smoother')
     if with_bt_navigator:
-        lifecycle_nodes.append('bt_navigator')
+        lifecycle_nodes.append('rogmap_bt_navigator')
 
     remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
+    rosout_disabled = ['--disable-rosout-logs']
 
-    def configured(source_file, root_key):
+    def configured(source_file, root_key, additional_rewrites=None):
+        rewrites = {
+            'use_sim_time': use_sim_time,
+            'autostart': autostart,
+        }
+        if additional_rewrites:
+            rewrites.update(additional_rewrites)
         return ParameterFile(
             RewrittenYaml(
                 source_file=source_file,
                 root_key=root_key,
-                param_rewrites={
-                    'use_sim_time': use_sim_time,
-                    'autostart': autostart,
-                },
+                param_rewrites=rewrites,
                 convert_types=True),
             allow_substs=True)
 
     configured_costmap_params = configured(costmap_params_file, 'costmap')
-    configured_rogmap_params = configured(rogmap_params_file, 'rogmap')
+    configured_rogmap_params = configured(
+        rogmap_params_file, 'rogmap', {'pcd_file': rogmap_pcd_file})
     configured_velocity_params = ParameterFile(
         RewrittenYaml(
             source_file=costmap_params_file,
@@ -169,20 +176,6 @@ def launch_setup(context, *args, **kwargs):
             ],
             remappings=remappings + [('cmd_vel', '/costmap/cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]))
 
-    if with_bt_navigator:
-        composable_nodes.append(ComposableNode(
-            package='nav2_bt_navigator',
-            plugin='nav2_bt_navigator::BtNavigator',
-            name='bt_navigator',
-            parameters=[
-                bt_params_file,
-                {
-                    'use_sim_time': use_sim_time,
-                    'default_nav_to_pose_bt_xml': bt_xml,
-                },
-            ],
-            remappings=remappings))
-
     nodes = [
         Node(
             condition=UnlessCondition(use_composition),
@@ -192,6 +185,7 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             respawn=use_respawn,
             respawn_delay=2.0,
+            ros_arguments=rosout_disabled,
             parameters=[
                 {'use_sim_time': use_sim_time},
                 *selected_backend_params,
@@ -206,6 +200,7 @@ def launch_setup(context, *args, **kwargs):
             executable='component_container_isolated',
             name=container_name,
             output='screen',
+            ros_arguments=rosout_disabled,
             parameters=selected_backend_params,
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings),
@@ -224,6 +219,7 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             respawn=use_respawn,
             respawn_delay=2.0,
+            ros_arguments=rosout_disabled,
             arguments=['--ros-args', '--log-level', log_level],
             parameters=[
                 {'use_sim_time': use_sim_time},
@@ -234,6 +230,21 @@ def launch_setup(context, *args, **kwargs):
                 {'min_prune_dist_from_start': 1.0},
                 {'min_prune_dist_from_goal': 1.0},
             ]))
+
+    if with_bt_navigator:
+        nodes.append(Node(
+            package='navflex_rogmap_bt_navigator',
+            executable='rogmap_bt_navigator',
+            name='rogmap_bt_navigator',
+            output='screen',
+            ros_arguments=rosout_disabled,
+            parameters=[
+                bt_params_file,
+                {'use_sim_time': use_sim_time},
+                {'default_nav_to_pose_bt_xml': bt_xml},
+            ],
+            arguments=['--ros-args', '--log-level', log_level],
+            remappings=remappings))
 
     lifecycle_manager_params = [
         {'use_sim_time': use_sim_time},
@@ -248,26 +259,11 @@ def launch_setup(context, *args, **kwargs):
         executable='lifecycle_manager',
         name='lifecycle_manager_navflex',
         output='screen',
+        ros_arguments=rosout_disabled,
         arguments=['--ros-args', '--log-level', log_level],
         parameters=lifecycle_manager_params)
 
     nodes.extend([
-        Node(
-            condition=UnlessCondition(use_composition) if with_bt_navigator else IfCondition('false'),
-            package='nav2_bt_navigator',
-            executable='bt_navigator',
-            name='bt_navigator',
-            output='screen',
-            parameters=[
-                bt_params_file,
-                {
-                    'use_sim_time': use_sim_time,
-                    'default_nav_to_pose_bt_xml': bt_xml,
-                },
-            ],
-            arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings),
-
         Node(
             condition=(
                 UnlessCondition(use_composition)
@@ -277,6 +273,7 @@ def launch_setup(context, *args, **kwargs):
             executable='velocity_smoother',
             name='velocity_smoother',
             output='screen',
+            ros_arguments=rosout_disabled,
             parameters=[configured_velocity_params],
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings + [('cmd_vel', '/costmap/cmd_vel_nav'), ('cmd_vel_smoothed', '/cmd_vel')]),
@@ -287,6 +284,7 @@ def launch_setup(context, *args, **kwargs):
             executable='lifecycle_manager',
             name='lifecycle_manager_navflex',
             output='screen',
+            ros_arguments=rosout_disabled,
             arguments=['--ros-args', '--log-level', log_level],
             parameters=lifecycle_manager_params),
 
@@ -301,10 +299,10 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     bringup_dir = get_package_share_directory('navflex_bringup')
-    bt_dir = get_package_share_directory('navflex_bt_navigator')
+    bt_dir = get_package_share_directory('navflex_rogmap_bt_navigator')
     nav2_route_dir = get_package_share_directory('nav2_route')
 
-    default_bt_params_file = os.path.join(bt_dir, 'params', 'navflex_bt_navigator.yaml')
+    default_bt_params_file = os.path.join(bt_dir, 'params', 'rogmap_bt_navigator.yaml')
     default_graph = os.path.join(nav2_route_dir, 'graphs', 'sample_graph.geojson')
 
     return LaunchDescription([
@@ -320,8 +318,10 @@ def generate_launch_description():
                               description='Costmap backend parameters'),
         DeclareLaunchArgument('rogmap_params_file', default_value='',
                               description='ROGMap backend parameters'),
+        DeclareLaunchArgument('rogmap_pcd_file', default_value='',
+                              description='ROGMap PCD map. Empty selects the bundled terrain map'),
         DeclareLaunchArgument('bt_params_file', default_value=default_bt_params_file,
-                              description='Full path to the bt_navigator parameters file'),
+                              description='Independent ROG-Map BT navigator parameters'),
         DeclareLaunchArgument('default_nav_to_pose_bt_xml', default_value='',
                               description='Optional BT XML override. Empty selects by navigation type'),
         DeclareLaunchArgument('autostart', default_value='true',
@@ -330,8 +330,8 @@ def generate_launch_description():
                               description='Respawn navflex_nav if it exits'),
         DeclareLaunchArgument('use_composition', default_value='true',
                               description='Load NavFlex lifecycle nodes into a component container'),
-        DeclareLaunchArgument('use_bt_navigator', default_value='true',
-                              description='Launch the standard Nav2 bt_navigator'),
+        DeclareLaunchArgument('use_bt_navigator', default_value='false',
+                              description='Launch the independent ROG-Map 3D BT navigator'),
         DeclareLaunchArgument('use_intra_process_comms', default_value='true',
                               description='Use intra-process communication for compatible composable data-path nodes'),
         DeclareLaunchArgument('container_name', default_value='navflex_container',

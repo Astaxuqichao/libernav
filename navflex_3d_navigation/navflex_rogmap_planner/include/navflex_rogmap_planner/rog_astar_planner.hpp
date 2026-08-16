@@ -64,6 +64,9 @@ private:
   };
 
   bool isStateValid(const geometry_msgs::msg::Point & point) const;
+  bool resolveGoal(
+    const geometry_msgs::msg::PoseStamped & requested,
+    geometry_msgs::msg::PoseStamped & resolved) const;
   bool isTransitionValid(const GridIndex & from, const GridIndex & to) const;
   bool insideSearchMap(const GridIndex & index) const;
   GridIndex positionToIndex(const geometry_msgs::msg::Point & point) const;
@@ -89,6 +92,8 @@ private:
   double resolution_{0.2};
   double inverse_resolution_{5.0};
   double max_planning_time_{1.0};
+  double goal_region_xy_radius_{0.0};
+  double goal_region_z_radius_{0.0};
   bool allow_diagonal_{true};
   bool use_inflated_map_{true};
   bool unknown_as_obstacle_{false};

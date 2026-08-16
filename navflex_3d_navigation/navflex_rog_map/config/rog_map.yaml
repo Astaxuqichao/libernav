@@ -16,6 +16,8 @@ rog_map:
     occupied_threshold: 0.70
     ray_min_range: 0.3
     ray_max_range: 15.0
+    enable_raycasting: true
+    enable_global_map_updates: true
     esdf_max_distance: 5.0
     inflation_resolution: 0.2
     inflation_step: 2

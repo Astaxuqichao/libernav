@@ -30,9 +30,12 @@ rog_map:
       occupied_threshold: 0.70
       ray_min_range: 0.3
       ray_max_range: 15.0
+      enable_raycasting: true
+      enable_global_map_updates: false
       esdf_max_distance: 10.0
       inflation_resolution: 0.1
-      inflation_step: 4
+      # Keep a 0.5 m center-height robot clear of the 0.1 m PCD ground voxels.
+      inflation_step: 3
       unknown_inflation: true
       unknown_inflation_step: 1
       unknown_threshold: 0.7
@@ -43,8 +46,8 @@ rog_map:
       frontier_extraction: true
       enable_esdf: true
       esdf_update_interval: 1
-      load_pcd: false
-      pcd_file: ""
+      load_pcd: true
+      pcd_file: "multilevel_ramp_stairs_0p1m.pcd"
       pcd_frame: map
       virtual_ground_height: -5.0
       virtual_ceiling_height: 15.0
@@ -52,7 +55,7 @@ rog_map:
 navflex_planner_server:
   ros__parameters:
     use_sim_time: true
-    planner_plugins: [RogAStar, FrontierCandidate, FrontierAStar]
+    planner_plugins: [RogAStar]
     planner_frequency: 0.0
     planner_patience: 5.0
     planner_max_retries: 3
@@ -61,9 +64,13 @@ navflex_planner_server:
       map_voxel_num: [120, 120, 60]
       allow_diagonal: true
       heuristic_type: 2
-      use_inflated_map: true
-      unknown_as_obstacle: true
+      use_inflated_map: false
+      # Static PCD maps contain obstacle surfaces but no explicit free-space rays.
+      unknown_as_obstacle: false
       max_planning_time: 2.0
+      # Search this region when the requested point falls on an occupied PCD surface.
+      goal_region_xy_radius: 0.5
+      goal_region_z_radius: 0.75
       footprint_type: sphere
       footprint_offset: [0.0, 0.0, 0.0]
       footprint_radius: 0.35
@@ -73,7 +80,7 @@ navflex_planner_server:
       front_sphere_radius: 0.3
       rear_sphere_offset: [-0.25, 0.0, 0.0]
       rear_sphere_radius: 0.3
-      footprint_safety_margin: 0.05
+      footprint_safety_margin: 0.0
       robot_frame: base_link
     FrontierCandidate:
       plugin: navflex_frontier_planner/CandidateFrontierPlanner
@@ -112,7 +119,7 @@ navflex_controller_server:
     cmd_vel_topic: /cmd_vel
     speed_limit_topic: /speed_limit
     ScanController:
-      plugin: scan_planner/ScanController
+      plugin: navflex_scan_planner/ScanController
       footprint_type: sphere
       footprint_offset: [0.0, 0.0, 0.0]
       footprint_radius: 0.35
@@ -122,8 +129,8 @@ navflex_controller_server:
       front_sphere_radius: 0.3
       rear_sphere_offset: [-0.25, 0.0, 0.0]
       rear_sphere_radius: 0.3
-      footprint_safety_margin: 0.05
-      trajectory_topic: scan_planner/optimized_path
+      footprint_safety_margin: 0.0
+      trajectory_topic: navflex_scan_planner/optimized_path
       sample_distance: 0.1
       control_point_distance: 0.2
       astar_resolution: 0.15

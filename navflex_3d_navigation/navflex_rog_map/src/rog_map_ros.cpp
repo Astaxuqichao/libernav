@@ -15,7 +15,9 @@ namespace navflex_rog_map
 {
 
 RogMapROS::RogMapROS(const rclcpp::NodeOptions & options)
-: nav2_util::LifecycleNode("rog_map", "", options), map_name_("rog_map")
+: nav2_util::LifecycleNode("rog_map", "", [](rclcpp::NodeOptions node_options) {
+    return node_options.enable_rosout(false);
+  }(options)), map_name_("rog_map")
 {
   declareParameters();
 }
@@ -30,7 +32,7 @@ RogMapROS::RogMapROS(
     name, "", rclcpp::NodeOptions().arguments({
     "--ros-args", "-r", "__ns:=" + nav2_util::add_namespaces(parent_namespace, local_namespace),
     "--ros-args", "-r", name + ":__node:=" + name
-  })),
+  }).enable_rosout(false)),
   map_name_(name), parent_namespace_(parent_namespace)
 {
   declareParameters();
@@ -59,6 +61,8 @@ void RogMapROS::declareParameters()
   declare_parameter("occupied_threshold", rclcpp::ParameterValue(0.70));
   declare_parameter("ray_min_range", rclcpp::ParameterValue(0.3));
   declare_parameter("ray_max_range", rclcpp::ParameterValue(15.0));
+  declare_parameter("enable_raycasting", rclcpp::ParameterValue(true));
+  declare_parameter("enable_global_map_updates", rclcpp::ParameterValue(true));
   declare_parameter("esdf_max_distance", rclcpp::ParameterValue(5.0));
   declare_parameter("inflation_resolution", rclcpp::ParameterValue(0.2));
   declare_parameter("inflation_step", rclcpp::ParameterValue(2));
@@ -103,6 +107,8 @@ RogMapConfig RogMapROS::loadConfig()
   get_parameter("ray_min_range", config.ray_min_range);get_parameter(
     "ray_max_range",
     config.ray_max_range);
+  get_parameter("enable_raycasting", config.enable_raycasting);
+  get_parameter("enable_global_map_updates", config.enable_global_map_updates);
   get_parameter("esdf_max_distance", config.esdf_max_distance);
   get_parameter("inflation_resolution", config.inflation_resolution);
   get_parameter("inflation_step", config.inflation_step);

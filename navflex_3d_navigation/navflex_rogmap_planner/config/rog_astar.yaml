@@ -9,3 +9,5 @@ navflex_planner_server:
       use_inflated_map: true
       unknown_as_obstacle: false
       max_planning_time: 1.0
+      goal_region_xy_radius: 0.0
+      goal_region_z_radius: 0.0

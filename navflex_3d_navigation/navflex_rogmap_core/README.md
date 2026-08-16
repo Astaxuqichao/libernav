@@ -1,41 +1,32 @@
 # navflex_rogmap_core
 
-Core contracts for a Nav2-style Navflex 3D navigation stack.
+ROGMap 后端的插件契约层。它刻意不拥有地图数据、不实现 ROS 传感器回调，也不复制
+占据网格；所有插件通过 `navflex_rog_map::RogMap::ConstPtr` 读取同一张地图。
 
-## Architecture
+## 数据流
 
 ```text
-PointCloud / depth / lidar
-          |
-    3D map server
-          |
-  shared navflex_rog_map::RogMap
-     /        |        \
- planner   controller  recovery
-     |        |          |
-Trajectory3D TwistStamped Result
+PCD / PointCloud2 / TF
+        -> navflex_rog_map::RogMapROS
+        -> RogMap (global occupancy + local ROGMap + ESDF)
+        -> GlobalPlanner / Controller / Recovery
 ```
 
-`navflex_rog_map` owns all map types, sensor input, TF, ray casting, probability
-updates, ESDF and sliding-window behavior. This package defines navigation
-plugin interfaces only. Every plugin receives the same read-only
-`navflex_rog_map::RogMap::ConstPtr`; no map representation is duplicated here.
+## 接口
 
-## Plugin contracts
+- `GlobalPlanner::makePlan(start, goal, Trajectory3D &, message)`：返回 `uint32_t`。
+- `Controller::setTrajectory()` 与带消息输出的 `computeVelocityCommands()`：输出
+  `TwistStamped`，可包含三维速度。
+- `Recovery::runBehavior(name, message)`：执行恢复行为并返回错误码。
 
-- `navflex_rogmap_core::GlobalPlanner`: produces a `Trajectory3D` from start and goal.
-- `navflex_rogmap_core::Controller`: tracks a trajectory and outputs full 3D velocity.
-- `navflex_rogmap_core::Recovery`: executes a named recovery using the same map.
+所有接口都遵循 `configure`、`activate`、`deactivate`、`cleanup` 生命周期，并使用
+Nav2 风格的字符串消息和取消语义。pluginlib 的 base class 分别是：
 
-All contracts use the Nav2 lifecycle sequence: `configure`, `activate`,
-`deactivate`, `cleanup`. Long-running operations expose cancellation or stop.
-
-Recommended pluginlib base class names:
-
-```xml
-base_class_type="navflex_rogmap_core::GlobalPlanner"
-base_class_type="navflex_rogmap_core::Controller"
-base_class_type="navflex_rogmap_core::Recovery"
+```text
+navflex_rogmap_core::GlobalPlanner
+navflex_rogmap_core::Controller
+navflex_rogmap_core::Recovery
 ```
 
-Map occupancy and ESDF semantics are defined exclusively by `navflex_rog_map`.
+地图状态、ESDF 和 sphere/cylinder/box/double_sphere footprint 语义只在
+`navflex_rog_map` 定义；插件只组合这些能力。

@@ -27,6 +27,7 @@ def generate_launch_description():
             executable='rog_map_server',
             name='rog_map',
             parameters=[params],
+            ros_arguments=['--disable-rosout-logs'],
             output='screen'),
         ComposableNodeContainer(
             condition=IfCondition(use_composition),
@@ -34,6 +35,7 @@ def generate_launch_description():
             executable='component_container_mt',
             name='rog_map_container',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             composable_node_descriptions=[
                 ComposableNode(
                     package='navflex_rog_map',
@@ -46,6 +48,7 @@ def generate_launch_description():
             executable='lifecycle_manager',
             name='lifecycle_manager_rog_map',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             parameters=[{
                 'autostart': autostart,
                 'node_names': ['rog_map']

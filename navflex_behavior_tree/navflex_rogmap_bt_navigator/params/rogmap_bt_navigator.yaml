@@ -1,0 +1,20 @@
+rogmap_bt_navigator:
+  ros__parameters:
+    use_sim_time: true
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 0.3
+    action_name: navigate_to_pose
+    goal_topic: goal_pose
+    rviz_point_topic: clicked_point
+    accept_goal_topic: true
+    accept_rviz_point: true
+    clicked_point_goal_yaw: 0.0
+    bt_loop_duration: 10
+    default_server_timeout: 1000
+    wait_for_service_timeout: 1000
+    plugin_lib_names:
+      - nav2_rate_controller_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - navflex_get_path_action
+      - navflex_exe_path_action

@@ -45,6 +45,8 @@ struct RogMapConfig
   double hit_probability{0.75}; double miss_probability{0.40}; double occupied_threshold{0.70};
   double min_probability{0.12}; double max_probability{0.97};
   double ray_min_range{0.3}; double ray_max_range{15.0}; double esdf_max_distance{5.0};
+  bool enable_raycasting{true};
+  bool enable_global_map_updates{true};
   double inflation_resolution{0.2}; int inflation_step{2};
   bool unknown_inflation{false}; int unknown_inflation_step{1};
   double unknown_threshold{0.7}; int point_filter_num{2}; int batch_update_size{2};
@@ -123,6 +125,11 @@ private:
   std::unordered_map<int64_t, Cell> global_cells_;
   std::unordered_set<int64_t> global_endpoint_voxels_;
   std::unordered_set<int64_t> global_occupied_cells_;
+  // The immutable PCD prior is reinserted whenever ROG-Map slides its local
+  // window, so local queries retain the static environment between sensor frames.
+  std::vector<geometry_msgs::msg::Point> static_pcd_points_;
+  geometry_msgs::msg::Point static_pcd_local_origin_;
+  bool static_pcd_loaded_in_local_map_{false};
   std::size_t loaded_pcd_points_{0};
   float hit_log_{0.0F}; float miss_log_{0.0F}; float min_log_{0.0F};
   float max_log_{0.0F}; float occupied_log_{0.0F}; std::atomic<uint64_t> revision_{0};

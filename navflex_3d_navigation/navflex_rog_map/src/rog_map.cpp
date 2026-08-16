@@ -55,6 +55,7 @@ public:
     cfg_.raycast_range_max = config.ray_max_range;
     cfg_.sqr_raycast_range_min = config.ray_min_range * config.ray_min_range;
     cfg_.sqr_raycast_range_max = config.ray_max_range * config.ray_max_range;
+    cfg_.raycasting_en = config.enable_raycasting;
     cfg_.map_size_d = rog_map::Vec3f(
       config.local_size_x, config.local_size_y, config.local_size_z);
     cfg_.local_update_box_d = cfg_.map_size_d;
@@ -95,6 +96,21 @@ public:
     if (cfg_.esdf_en) {
       esdf_map_->updateESDF3D(getLocalMapOrigin());
     }
+  }
+
+  void loadOccupiedPoints(const std::vector<geometry_msgs::msg::Point> & points)
+  {
+    rog_map::PointCloud cloud;
+    cloud.reserve(points.size());
+    for (const auto & point : points) {
+      rog_map::PclPoint sample;
+      sample.x = point.x;
+      sample.y = point.y;
+      sample.z = point.z;
+      sample.intensity = 1.0F;
+      cloud.push_back(sample);
+    }
+    loadOccupiedCloud(cloud);
   }
 
   void clear()
@@ -221,29 +237,29 @@ RogMap::RogMap(RogMapConfig config)
     if (pcl::io::loadPCDFile(config_.pcd_file, pcd_cloud) < 0) {
       throw std::runtime_error("Failed to load PCD map: " + config_.pcd_file);
     }
-    rog_map::PointCloud cloud;
-    cloud.reserve(pcd_cloud.size());
     for (const auto & sample : pcd_cloud) {
       if (!std::isfinite(sample.x) || !std::isfinite(sample.y) || !std::isfinite(sample.z)) {
         continue;
       }
-      rog_map::PclPoint rog_sample;
-      rog_sample.x = sample.x;
-      rog_sample.y = sample.y;
-      rog_sample.z = sample.z;
-      rog_sample.intensity = 0.0F;
-      cloud.push_back(rog_sample);
       geometry_msgs::msg::Point point;
-      point.x = sample.x; point.y = sample.y; point.z = sample.z;
+      point.x = sample.x;
+      point.y = sample.y;
+      point.z = sample.z;
       Index3D index;
       if (!worldToGrid(point, index)) {
         continue;
       }
       global_cells_[key(index)].log_odds = max_log_;
       global_occupied_cells_.insert(key(index));
+      static_pcd_points_.push_back(point);
       ++loaded_pcd_points_;
     }
-    official_map_->loadOccupiedCloud(cloud);
+    official_map_->loadOccupiedPoints(static_pcd_points_);
+    const auto local_origin = official_map_->getLocalMapOrigin();
+    static_pcd_local_origin_.x = local_origin.x();
+    static_pcd_local_origin_.y = local_origin.y();
+    static_pcd_local_origin_.z = local_origin.z();
+    static_pcd_loaded_in_local_map_ = true;
     ++revision_;
   }
 }
@@ -392,7 +408,7 @@ bool RogMap::shouldUpdateLocal(unsigned int flags) const
 bool RogMap::shouldObserveGlobal(
   unsigned int flags, const geometry_msgs::msg::Point & endpoint) const
 {
-  if ((flags & 2U) == 0U) {
+  if (!config_.enable_global_map_updates || (flags & 2U) == 0U) {
     return false;
   }
   const double range = distance(global_sensor_origin_, endpoint);
@@ -465,7 +481,8 @@ void RogMap::update(
   cloud.reserve((points.size() + minimum_filter - 1) / minimum_filter);
   for (std::size_t index = 0; index < points.size(); ++index) {
     const bool update_local = index % config_.point_filter_num == 0;
-    const bool update_global = index % config_.global_point_filter_num == 0;
+    const bool update_global = config_.enable_global_map_updates &&
+      index % config_.global_point_filter_num == 0;
     if (!update_local && !update_global) {
       continue;
     }
@@ -482,6 +499,20 @@ void RogMap::update(
   pose.first = rog_map::Vec3f(sensor_origin.x, sensor_origin.y, sensor_origin.z);
   pose.second = super_utils::Quatf::Identity();
   official_map_->updateMap(cloud, pose);
+  if (config_.load_pcd && !static_pcd_points_.empty()) {
+    const auto local_origin = official_map_->getLocalMapOrigin();
+    geometry_msgs::msg::Point current_origin;
+    current_origin.x = local_origin.x();
+    current_origin.y = local_origin.y();
+    current_origin.z = local_origin.z();
+    if (!static_pcd_loaded_in_local_map_ ||
+      distance(current_origin, static_pcd_local_origin_) > config_.local_resolution * 0.5)
+    {
+      official_map_->loadOccupiedPoints(static_pcd_points_);
+      static_pcd_local_origin_ = current_origin;
+      static_pcd_loaded_in_local_map_ = true;
+    }
+  }
   ++revision_;
 }
 
@@ -903,8 +934,25 @@ void RogMap::reset()
   global_cells_.clear();
   global_endpoint_voxels_.clear();
   global_occupied_cells_.clear();
-  loaded_pcd_points_ = 0;
   official_map_->clear();
+  if (!static_pcd_points_.empty()) {
+    for (const auto & point : static_pcd_points_) {
+      Index3D index;
+      if (!worldToGrid(point, index)) {
+        continue;
+      }
+      global_cells_[key(index)].log_odds = max_log_;
+      global_occupied_cells_.insert(key(index));
+    }
+    official_map_->loadOccupiedPoints(static_pcd_points_);
+    const auto local_origin = official_map_->getLocalMapOrigin();
+    static_pcd_local_origin_.x = local_origin.x();
+    static_pcd_local_origin_.y = local_origin.y();
+    static_pcd_local_origin_.z = local_origin.z();
+    static_pcd_loaded_in_local_map_ = true;
+  } else {
+    static_pcd_loaded_in_local_map_ = false;
+  }
   ++revision_;
 }
 }  // namespace navflex_rog_map

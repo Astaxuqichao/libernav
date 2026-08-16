@@ -64,6 +64,10 @@ void RogAStarPlanner::configure(
   nav2_util::declare_parameter_if_not_declared(
     node_, name_ + ".max_planning_time", rclcpp::ParameterValue(1.0));
   nav2_util::declare_parameter_if_not_declared(
+    node_, name_ + ".goal_region_xy_radius", rclcpp::ParameterValue(0.0));
+  nav2_util::declare_parameter_if_not_declared(
+    node_, name_ + ".goal_region_z_radius", rclcpp::ParameterValue(0.0));
+  nav2_util::declare_parameter_if_not_declared(
     node_, name_ + ".footprint_type", rclcpp::ParameterValue(std::string("sphere")));
   nav2_util::declare_parameter_if_not_declared(
     node_, name_ + ".footprint_offset",
@@ -101,6 +105,11 @@ void RogAStarPlanner::configure(
   use_inflated_map_ = node_->get_parameter(name_ + ".use_inflated_map").as_bool();
   unknown_as_obstacle_ = node_->get_parameter(name_ + ".unknown_as_obstacle").as_bool();
   max_planning_time_ = node_->get_parameter(name_ + ".max_planning_time").as_double();
+  goal_region_xy_radius_ = node_->get_parameter(name_ + ".goal_region_xy_radius").as_double();
+  goal_region_z_radius_ = node_->get_parameter(name_ + ".goal_region_z_radius").as_double();
+  if (goal_region_xy_radius_ < 0.0 || goal_region_z_radius_ < 0.0) {
+    throw std::invalid_argument("ROG A* goal-region radii must be non-negative");
+  }
   footprint_.type = navflex_rog_map::footprintTypeFromString(
     node_->get_parameter(name_ + ".footprint_type").as_string());
   const auto footprint_offset =
@@ -151,9 +160,11 @@ void RogAStarPlanner::configure(
   nodes_.resize(count);
   RCLCPP_INFO(
     node_->get_logger(),
-    "Configured %s: voxels=%zu resolution=%.3f diagonal=%s inflated=%s unknown_occ=%s",
+    "Configured %s: voxels=%zu resolution=%.3f diagonal=%s inflated=%s unknown_occ=%s "
+    "goal_region=(%.2f, %.2f)",
     name_.c_str(), count, resolution_, allow_diagonal_ ? "true" : "false",
-    use_inflated_map_ ? "true" : "false", unknown_as_obstacle_ ? "true" : "false");
+    use_inflated_map_ ? "true" : "false", unknown_as_obstacle_ ? "true" : "false",
+    goal_region_xy_radius_, goal_region_z_radius_);
 }
 
 void RogAStarPlanner::cleanup()
@@ -198,13 +209,14 @@ uint32_t RogAStarPlanner::makePlan(
     message = "Start is occupied, unknown, or outside the ROG map";
     return kInvalidStart;
   }
-  if (!isStateValid(goal.pose.position)) {
-    message = "Goal is occupied, unknown, or outside the ROG map";
+  geometry_msgs::msg::PoseStamped planning_goal;
+  if (!resolveGoal(goal, planning_goal)) {
+    message = "Goal and its configured planning region are occupied, unknown, or outside the ROG map";
     return kInvalidGoal;
   }
 
   const GridIndex start_index = positionToIndex(start.pose.position);
-  const GridIndex goal_index = positionToIndex(goal.pose.position);
+  const GridIndex goal_index = positionToIndex(planning_goal.pose.position);
   search_center_.x = (start_index.x + goal_index.x) / 2;
   search_center_.y = (start_index.y + goal_index.y) / 2;
   search_center_.z = (start_index.z + goal_index.z) / 2;
@@ -255,11 +267,17 @@ uint32_t RogAStarPlanner::makePlan(
     if (current->index.x == goal_index.x && current->index.y == goal_index.y &&
       current->index.z == goal_index.z)
     {
-      buildTrajectory(current, start, goal, trajectory);
+      buildTrajectory(current, start, planning_goal, trajectory);
       trajectory.duration =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
       message = "ROG A* found a 3D path with " +
         std::to_string(trajectory.path.poses.size()) + " poses";
+      if (planning_goal.pose.position.x != goal.pose.position.x ||
+        planning_goal.pose.position.y != goal.pose.position.y ||
+        planning_goal.pose.position.z != goal.pose.position.z)
+      {
+        message += "; adjusted requested goal to a valid point in the planning region";
+      }
       return kSuccess;
     }
     current->state = NodeState::CLOSED;
@@ -358,6 +376,61 @@ bool RogAStarPlanner::isStateValid(const geometry_msgs::msg::Point & point) cons
   pose.position = point;
   pose.orientation.w = 1.0;
   return map_->isGlobalCollisionFree(pose, footprint_, unknown_as_obstacle_);
+}
+
+bool RogAStarPlanner::resolveGoal(
+  const geometry_msgs::msg::PoseStamped & requested,
+  geometry_msgs::msg::PoseStamped & resolved) const
+{
+  if (isStateValid(requested.pose.position)) {
+    resolved = requested;
+    return true;
+  }
+  if (goal_region_xy_radius_ <= 0.0 && goal_region_z_radius_ <= 0.0) {
+    return false;
+  }
+
+  const GridIndex center = positionToIndex(requested.pose.position);
+  const int xy_steps = static_cast<int>(std::ceil(goal_region_xy_radius_ * inverse_resolution_));
+  const int z_steps = static_cast<int>(std::ceil(goal_region_z_radius_ * inverse_resolution_));
+  const double xy_radius_squared = goal_region_xy_radius_ * goal_region_xy_radius_;
+  double best_distance_squared = std::numeric_limits<double>::infinity();
+  geometry_msgs::msg::Point best_point;
+  bool found = false;
+
+  for (int z = -z_steps; z <= z_steps; ++z) {
+    for (int y = -xy_steps; y <= xy_steps; ++y) {
+      for (int x = -xy_steps; x <= xy_steps; ++x) {
+        const double dx = x * resolution_;
+        const double dy = y * resolution_;
+        if (dx * dx + dy * dy > xy_radius_squared) {
+          continue;
+        }
+        const GridIndex candidate_index{center.x + x, center.y + y, center.z + z};
+        const auto candidate = indexToPosition(candidate_index);
+        const double dz = candidate.z - requested.pose.position.z;
+        if (std::abs(dz) > goal_region_z_radius_ || !isStateValid(candidate)) {
+          continue;
+        }
+        const double distance_squared =
+          (candidate.x - requested.pose.position.x) *
+          (candidate.x - requested.pose.position.x) +
+          (candidate.y - requested.pose.position.y) *
+          (candidate.y - requested.pose.position.y) + dz * dz;
+        if (distance_squared < best_distance_squared) {
+          best_distance_squared = distance_squared;
+          best_point = candidate;
+          found = true;
+        }
+      }
+    }
+  }
+  if (!found) {
+    return false;
+  }
+  resolved = requested;
+  resolved.pose.position = best_point;
+  return true;
 }
 
 bool RogAStarPlanner::insideSearchMap(const GridIndex & index) const

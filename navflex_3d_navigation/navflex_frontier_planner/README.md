@@ -1,26 +1,25 @@
 # navflex_frontier_planner
 
-ROGMap-based frontier planning plugins for Navflex 3D navigation. The package
-implements `navflex_rogmap_core::GlobalPlanner`.
+ROGMap frontier 插件，用于在共享三维地图中选择可到达的未知边界。它不订阅点云、
+不维护私有 occupancy map，而是直接查询 `navflex_rog_map::RogMap::ConstPtr`；因此
+frontier 可见性、双球体 clearance、ESDF 和 A* 碰撞判断与其他 ROGMap 插件完全一致。
 
-The planner does not subscribe to a point cloud and does not build a private
-occupancy map. `navflex_rog_map` consumes `PointCloud2` and passes the shared
-`RogMap::ConstPtr` to each plugin. Frontier state, visibility, clearance, and
-A* validity therefore use the same map as the Navflex planner server.
+## 插件
 
-## Plugins
+- `CandidateFrontierPlanner`：提取局部 frontier，按信息增益、距离、clearance 和
+  目标权重排序并生成候选轨迹。
+- `FrontierAStarPlanner`：选择最佳可达候选，并在 ROGMap 全局/局部查询上执行 A*。
 
-- `navflex_frontier_planner/CandidateFrontierPlanner` returns ranked reachable
-  frontier viewpoints in a `Trajectory3D` path.
-- `navflex_frontier_planner/FrontierAStarPlanner` returns a collision-free
-  ROGMap A* trajectory to the best reachable frontier.
+两者都实现 `navflex_rogmap_core::GlobalPlanner`，由 `navflex_nav` 的 planner server
+统一加载和取消。参数集中在 `rogmap_params.yaml` 的 `frontier_shared_config`，
+地图输入只在 `rog_map.rog_map` 配置一次。
 
-## Configuration
-
-The package is configured in `navflex_bringup/params/rogmap_params.yaml` under
-`frontier_shared_config`. The point cloud topic is configured only through
-`rog_map.point_cloud_topic`.
+## 运行和调试
 
 ```bash
-colcon build --symlink-install --packages-up-to navflex_frontier_planner
+colcon build --packages-up-to navflex_frontier_planner --symlink-install
+ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=rogmap
 ```
+
+调试重点是 `frontier_extraction`、`local_range`、`min_frontier_cells`、候选数量和
+footprint clearance；不要在该包中重新配置点云 topic 或地图分辨率。

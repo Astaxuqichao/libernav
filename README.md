@@ -1,261 +1,158 @@
-# navflex
+# Navflex
 
-Navflex 是基于 ROS 2 Humble 和 Nav2 的导航扩展包集合。它把 costmap、规划、控制、BT 行为树、自定义恢复行为、本地仿真和 TB3 manipulation Gazebo 仿真整理成一套可直接启动的导航工作区。
+Navflex 是面向 ROS 2 Humble 的模块化导航框架。它保留 Nav2 的 lifecycle、action
+和 pluginlib 使用方式，同时把地图、规划、控制和行为树组织成可替换的后端。当前
+后端包括二维 Nav2 costmap 和三维 ROG-Map。
 
-![Navflex 导航演示](metapackages/navflex/docs/assets/navflex_test_small.gif)
+Navflex 的核心是 `navflex_nav`，不是某一种地图。`navflex_nav` 将 Nav2 风格的
+lifecycle、action server、执行线程、取消、重试、错误码和插件装配收敛为一套通用
+执行框架；costmap 与 ROGMap 只是该框架中的后端实现。
 
-更详细的启动参数和排查命令见
-[navflex_bringup/README.md](navflex_bringup/README.md)。
+## 核心架构
 
-## 目录编排
+```text
+                    navflex_bringup / BT / application
+                                      |
+                                navflex_nav
+        lifecycle + action + execution + retry + cancel + plugin adapters
+                     /                                      \
+          CostmapNavNode                                  RogMapNavNode
+  shared global/local costmap                       shared RogMap::ConstPtr
+        nav2_core plugins                         navflex_rogmap_core plugins
+```
 
-仓库按运行职责组织。目录只负责分组，ROS 2 包名保持不变，colcon 会递归发现各包。
+`navflex_nav` 是统一执行层。它负责生命周期、action server、线程、取消、重试、
+错误消息和插件适配；后端节点只负责装配不同地图和插件：
+
+```text
+CostmapNavNode -> nav2_core plugins -> Nav2 costmap
+RogMapNavNode  -> navflex_rogmap_core plugins -> shared RogMap
+```
+
+两条后端使用相同的执行状态机和 action 语义，但保持自己的地图查询和插件契约。
+ROGMap 模式不启动 `nav2_bt_navigator`，而由 `navflex_rogmap_bt_navigator` 独立
+加载三维行为树，直接调用 `RogAStar` 和 `ScanController`。
+
+### 通用抽象与地图共享
+
+- **执行抽象**：规划、控制、恢复都经过 `navflex_base` 的共用 action/execution
+  状态机。后端差异被 adapter 隔离，不会蔓延到行为树和部署层。
+- **地图共享**：每个后端由地图节点拥有地图和更新线程，并将同一地图实例交给该后端
+  的 planner、controller、recovery。插件只查询地图，不创建私有副本。
+- **二维后端**：`CostmapNavNode` 共享 Nav2 global/local costmap，并直接使用
+  `nav2_core` 的 planner/controller/behavior 接口。
+- **三维后端**：`RogMapNavNode` 共享 `RogMap::ConstPtr`；`navflex_rog_map` 负责
+  PCD、点云、稀疏全局占据、局部滑窗、ESDF 和 footprint 查询，
+  `navflex_rogmap_core` 只定义三维插件契约。
+- **一致的行为语义**：后端都遵循 configure/activate/deactivate/cleanup 和一致的
+  action 取消、重试、消息输出。应用层通过稳定命名空间选择后端，而不是绑定某种地图。
+
+ROGMap 还提供 `sphere`、`cylinder`、`box` 和 `double_sphere` footprint；全局 PCD
+可以静态保留，局部图继续融合传感器点云。这些是三维后端能力，不是 Navflex 执行框架
+的前提。
+
+## 源码布局
 
 ```text
 navflex/
-├── navflex/                   完整功能 metapackage
-├── navflex_bringup/           Launch、参数、地图和 RViz 配置
-├── navflex_nav/               2D/3D 共用导航执行服务
-├── navflex_common/            navflex_utility 和日志库
-├── navflex_3d_navigation/     ROG Map、3D A* 和四足局部规划控制
-├── navflex_costmap_navigation/ Costmap 插件、禁区和 Frontier 规划
-├── navflex_behavior_tree/     BT Navigator、自定义节点和探索行为树
-└── navflex_simulation/        假底盘和仿真激光
+├── navflex/                         metapackage
+├── navflex_bringup/                 launch、参数、PCD、RViz
+├── navflex_nav/                     共用执行层与 costmap/rogmap 后端
+├── navflex_3d_navigation/
+│   ├── navflex_rog_map/             ROGMap ROS 2 lifecycle 地图服务器
+│   ├── navflex_rogmap_core/         三维插件接口
+│   ├── navflex_rogmap_planner/      RogAStar 全局规划器
+│   ├── navflex_scan_planner/        SCAN/BSpline 局部控制器
+│   ├── navflex_frontier_planner/    frontier 规划器
+│   └── navflex_rviz_plugins/        RViz 三维目标面板
+├── navflex_behavior_tree/
+│   ├── navflex_rogmap_bt_navigator/ 独立三维 BT navigator
+│   └── navflex_bt_nodes/             GetPath、ExePath、Recovery 节点
+├── navflex_simulation/              PCD 地形、底盘和传感器仿真
+├── navflex_common/                  utility 和日志
+└── navflex_costmap_navigation/      costmap 扩展插件
 ```
 
-工作区外置包：
-
-```text
-../navflex_vln/
-└── navflex_instruction_server/  独立指令、语义地图、任务和 VLN 服务包
-```
-
-依赖方向应保持为：应用和行为树依赖导航层，导航层依赖地图和公共层；底层包不能反向
-依赖应用、部署或仿真目录。
-
-## 包功能
-
-| 包名 | 功能 |
-| --- | --- |
-| `navflex` | Metapackage，聚合仓库内全部 Navflex 功能包，便于统一安装和构建 |
-| `navflex_bringup` | 统一启动包，维护 launch、地图、参数、RViz 配置；提供本地仿真、TB3 manipulation Gazebo 仿真和 Navflex 导航栈启动入口 |
-| `navflex_nav` | 核心导航服务端；在一个 lifecycle 节点内管理 global/local costmap，并提供 `/compute_path_to_pose`、`/follow_path`、`/behavior_action` |
-| `navflex_bt_navigator` | BT Navigator 封装包，提供 Navflex 默认行为树 XML 和 BT Navigator 参数 |
-| `navflex_bt_nodes` | 自定义 BT 节点，包括 GetPath、ExePath、Recovery；`NavflexExePathAction` 支持运行中路径更新和 FollowPath 容差传递 |
-| `navflex_cmdbehavior` | Nav2 behavior 插件，提供 `rotate`、`linear`、`wait` 等简单恢复/动作命令 |
-| `navflex_exclusion_zone` | Nav2 costmap 电子禁区层插件，可通过话题动态标记禁行区域 |
-| `navflex_utility` | 公共工具库，提供机器人状态、TF/odom 查询和导航辅助函数 |
-| `omni_fake_node` | 本地全向虚拟机器人，订阅 `/cmd_vel`，发布 `/odom`、TF 和本地仿真 `/clock` |
-| `simulation_lidar` | 基于 OccupancyGrid 地图射线投射的 2D 仿真激光雷达，发布 `/scan` 和 `/scan_cloud` |
-| `rcl_logging_spdlog_rotating` | 自定义 ROS 2 spdlog 滚动日志后端 |
-
-## navflex_nav 设计
-
-`navflex_nav` 是 Navflex 的核心导航执行层。它没有直接复用 Nav2 的整套
-planner/controller/behavior server 进程组合，而是在一个 `CostmapNavNode`
-lifecycle 节点里统一管理 costmap、插件服务器和 action 执行，从而让 Navflex 可以在
-同一套生命周期下协调规划、控制、行为恢复和代价地图查询。
-
-顶层结构如下：
-
-```text
-CostmapNavNode (nav2_util::LifecycleNode)
-├── global_costmap  -> PlannerCostmapServer    -> nav2_core::GlobalPlanner
-├── local_costmap   -> ControllerCostmapServer -> nav2_core::Controller
-└── global/local    -> BehaviorCostmapServer   -> nav2_core::Behavior
-```
-
-核心设计点：
-
-- **统一生命周期**：`CostmapNavNode` 由 `lifecycle_manager` 驱动
-  `configure -> activate -> deactivate -> cleanup`，在各阶段统一创建、激活、
-  停止和释放 global/local costmap、Planner、Controller、Behavior server。
-- **复用 Nav2 插件体系**：全局规划、路径跟踪和行为恢复仍通过
-  `nav2_core::GlobalPlanner`、`nav2_core::Controller`、`nav2_core::Behavior`
-  插件接口扩展，Navflex 主要负责执行编排和 action 封装。
-- **分离 costmap 与执行线程**：global/local costmap 各自运行在独立
-  `NodeThread` 中；三个 server 也分别运行在独立 `NodeThread` 中，避免代价地图更新、
-  action 接收和长时间执行互相阻塞。
-- **Action/Execution 双层抽象**：`NavflexActionBase<Action, Execution>` 负责
-  action goal、cancel、并发槽位和结果回传；具体 `PlannerExecution`、
-  `ControllerExecution`、`BehaviorExecution` 负责调用插件完成实际任务。
-- **并发槽位模型**：action goal 可通过 `concurrency_slot` 分配到 0-255 号槽位。
-  同一槽位的新任务会替换旧任务，不同槽位可并行执行，便于后续扩展多任务或分组控制。
-- **控制层运行时能力**：`/follow_path` 支持运行中路径更新、到点容差透传，以及卡困检测；
-  卡困时会以明确结果码 abort，并在结果消息中给出位移、耗时和阈值。
-- **代价地图查询服务**：节点激活后提供 `check_point_cost`、`check_pose_cost`、
-  `check_path_cost`，可直接查询点、位姿或路径在 global/local costmap 中的通行状态。
-- **路网导航扩展**：可选接入 `nav2_route`，在拓扑图上规划路网路径，再转成
-  `nav_msgs/Path` 交给 `FollowPath` 执行。
-
-更完整的类关系、线程模型和回调链见
-[navflex_nav/docs/ARCHITECTURE.md](navflex_nav/docs/ARCHITECTURE.md)。
+各层依赖方向为：`bringup/app -> BT/navflex_nav -> backend map/core -> third-party`。
+地图层不依赖 bringup、仿真或具体 planner，插件也不拥有地图生命周期。
 
 ## 获取源码
 
-Navflex 依赖修改过接口的 Nav2，因此必须使用
-[`Astaxuqichao/navigation2`](https://github.com/Astaxuqichao/navigation2) 的
-`humble` 分支。不要使用 `ros-humble-navigation2` 替代该源码仓库，否则扩展后的
-`nav2_msgs/action/FollowPath.action` 会与 Navflex 不兼容。
-
-在一个空的 ROS 2 工作区根目录中拉取三个并列仓库：
+在工作区外层获取 Nav2、时空体素层和 Navflex：
 
 ```bash
 mkdir -p ~/ros2/nav_ws
 cd ~/ros2/nav_ws
-
-git clone --branch humble --single-branch \
-  https://github.com/Astaxuqichao/navigation2.git navigation2
-git clone --branch humble --single-branch \
-  https://github.com/SteveMacenski/spatio_temporal_voxel_layer.git \
-  spatio_temporal_voxel_layer
+git clone --branch humble --single-branch https://github.com/Astaxuqichao/navigation2.git navigation2
+git clone --branch humble --single-branch https://github.com/SteveMacenski/spatio_temporal_voxel_layer.git spatio_temporal_voxel_layer
 git clone https://github.com/Astaxuqichao/navflex.git navflex
 ```
 
-完成后的必要目录结构为：
-
-```text
-nav_ws/
-├── navigation2/                   Astaxuqichao 的 Nav2 Humble 分支
-├── spatio_temporal_voxel_layer/   开源三维时空体素障碍层
-└── navflex/                       Navflex
-```
-
-已有工作区可用以下命令检查来源与分支：
-
-```bash
-git -C navigation2 remote get-url origin
-git -C navigation2 branch --show-current
-git -C spatio_temporal_voxel_layer remote get-url origin
-git -C spatio_temporal_voxel_layer branch --show-current
-```
-
-预期两个分支均为 `humble`，仓库地址分别为：
-
-```text
-https://github.com/Astaxuqichao/navigation2.git
-https://github.com/SteveMacenski/spatio_temporal_voxel_layer.git
-```
-
-## 主要依赖
-
-- ROS 2 Humble
-- [`Astaxuqichao/navigation2`](https://github.com/Astaxuqichao/navigation2)，`humble` 分支
-- [`SteveMacenski/spatio_temporal_voxel_layer`](https://github.com/SteveMacenski/spatio_temporal_voxel_layer)，`humble` 分支
-- TurtleBot3 / TurtleBot3 Manipulation / TurtleBot3 Simulations
-- Gazebo Classic 11
-- `ros2_control`、`controller_manager`、`xacro`
-
-从新环境准备依赖时，在工作区根目录执行：
-
-```bash
-source /opt/ros/humble/setup.bash
-rosdep update
-rosdep install --from-paths \
-  navigation2 spatio_temporal_voxel_layer navflex \
-  --ignore-src -r -y --rosdistro humble
-```
+Navflex 使用 `Astaxuqichao/navigation2` 中与 FollowPath/action 相关的扩展接口，
+不要用系统中不匹配的 Nav2 替代。
 
 ## 编译
+
+所有 build/install/log 都位于 `nav_ws` 外层，不要在 `navflex/` 源码目录编译：
 
 ```bash
 cd ~/ros2/nav_ws
 source /opt/ros/humble/setup.bash
+rosdep install --from-paths navigation2 spatio_temporal_voxel_layer navflex --ignore-src -r -y
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 ```
 
-只构建 Navflex 及其依赖时，可通过 metapackage 选择整套功能包：
+## 启动
+
+先启动 costmap 后端。它使用 `CostmapNavNode`、Nav2 costmap 和 `nav2_core` 插件，
+是验证 Navflex 通用执行架构的基础方式：
 
 ```bash
-colcon build --packages-up-to navflex \
-  --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
-source install/setup.bash
+ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=costmap
 ```
 
-如果改过 `navigation2/nav2_msgs/action/FollowPath.action`，需要重编依赖该 action 的包，至少包括：
-
-```bash
-colcon build --packages-select \
-  nav2_msgs nav2_behavior_tree nav2_bt_navigator \
-  navflex_nav navflex_bt_nodes navflex_bt_navigator \
-  navflex_bringup
-source install/setup.bash
-```
-
-## 本地全向仿真快速启动
-
-终端 1，启动本地仿真环境：
+二维仿真与导航栈分开启动。先启动全向底盘、地图、二维激光、TF 和 RViz：
 
 ```bash
 ros2 launch navflex_bringup sim_local_launch.py
 ```
 
-终端 2，启动 Navflex 导航栈：
+然后在另一个已 source 工作区的终端启动 costmap 后端：
 
 ```bash
-source install/setup.bash
-ros2 launch navflex_bringup navflex_bringup_launch.py
+ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=costmap
 ```
 
-默认导航参数为 `chassis_model:=omni`，适配 `omni_fake_node`。
-
-## TB3 Manipulation 移动操作仿真
-
-TB3 manipulation 是差速底盘，不是全向底盘。启动导航时必须使用 `chassis_model:=diff`。
-
-终端 1，启动 TB3 manipulation Gazebo 仿真：
+显式启动 ROGMap；默认 PCD 和全局静态地图参数由 bringup 提供：
 
 ```bash
-ros2 launch navflex_bringup tb3_manipulation_sim_launch.py
+ros2 launch navflex_bringup navflex_bringup_launch.py navigation_type:=rogmap
 ```
 
-默认是无头 Gazebo server，并启动 RViz。需要 Gazebo GUI 时有两种方式：
+只启动 PCD 地形、里程计和 TF 仿真：
 
 ```bash
-ros2 launch navflex_bringup tb3_manipulation_sim_launch.py gui:=true
+ros2 launch navflex_bringup pcd_terrain_simulator_launch.py
 ```
 
-或者在无头仿真已经启动后，另开终端连接：
+需要三维行为树时，在仿真之外单独启动：
 
 ```bash
-gzclient
+ros2 launch navflex_bringup navflex_bringup_launch.py use_bt_navigator:=true
 ```
 
-终端 2，启动 Navflex 导航栈并选择 TB3 差速参数：
+## 包文档
 
-```bash
-source install/setup.bash
-ros2 launch navflex_bringup navflex_bringup_launch.py chassis_model:=diff
-```
-
-启动后可在 RViz 使用 `2D Goal Pose` 发送导航目标。
-
-常用检查：
-
-```bash
-ros2 topic echo /clock
-ros2 run tf2_ros tf2_echo map base_link
-ros2 topic hz /local_costmap/costmap
-ros2 topic hz /global_costmap/costmap
-```
-
-## FollowPath 到点容差
-
-Navflex 扩展了 `nav2_msgs/action/FollowPath`：
-
-- `xy_goal_tolerance`
-- `yaw_goal_tolerance`
-
-两个值都为 `0.0` 时，`navflex_nav` 使用参数文件中的默认到点精度。控制器内部仍通过 `nav2_core::GoalChecker` 判断是否到点；每个新的 FollowPath goal 会按 action 容差生成对应的 goal checker。
-
-## 文档入口
-
-- Bringup、依赖、TB3 仿真和排查：[navflex_bringup/README.md](navflex_bringup/README.md)
-- 核心导航服务端：[navflex_nav/README.md](navflex_nav/README.md)
-- 文本/语义任务入口：[navflex_instruction_server/README.md](../navflex_vln/navflex_instruction_server/README.md)
-- 本地全向假机器人：[omni_fake_node/README.md](navflex_simulation/omni_fake_node/README.md)
-
-## License
-
-Apache-2.0
+- [navflex_nav](navflex_nav/README.md)：统一执行层、后端节点和 action 命名空间
+- [navflex_rog_map](navflex_3d_navigation/navflex_rog_map/README.md)：地图数据流、
+  全局/局部语义和生命周期
+- [navflex_rogmap_core](navflex_3d_navigation/navflex_rogmap_core/README.md)：插件契约
+- [navflex_rogmap_planner](navflex_3d_navigation/navflex_rogmap_planner/README.md)：
+  三维 A*、目标区域和 footprint
+- [navflex_scan_planner](navflex_3d_navigation/navflex_scan_planner/README.md)：局部
+  SCAN、B-spline、ESDF 控制链
+- [navflex_rogmap_bt_navigator](navflex_behavior_tree/navflex_rogmap_bt_navigator/README.md)：
+  独立三维行为树
+- [navflex_bringup](navflex_bringup/README.md)：启动入口和参数组织
+- [3D navigation](navflex_3d_navigation/README.md)：三维包关系
