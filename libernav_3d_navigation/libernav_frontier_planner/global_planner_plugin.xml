@@ -1,0 +1,12 @@
+<library path="libernav_frontier_planner">
+  <class name="libernav_frontier_planner/CandidateFrontierPlanner"
+         type="libernav_frontier_planner::CandidateFrontierPlanner"
+         base_class_type="libernav_rogmap_core::GlobalPlanner">
+    <description>Selects reachable ROGMap frontier viewpoints.</description>
+  </class>
+  <class name="libernav_frontier_planner/FrontierAStarPlanner"
+         type="libernav_frontier_planner::FrontierAStarPlanner"
+         base_class_type="libernav_rogmap_core::GlobalPlanner">
+    <description>Selects a ROGMap frontier and creates a collision-free grid A* path.</description>
+  </class>
+</library>

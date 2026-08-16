@@ -1,4 +1,0 @@
-navflex_nav:
-  ros__parameters:
-    # costmap, rogmap, or both. In both mode ROGMap uses the /rogmap namespace.
-    navigation_type: costmap

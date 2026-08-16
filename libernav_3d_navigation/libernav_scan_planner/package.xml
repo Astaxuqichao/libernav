@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>libernav_scan_planner</name>
+  <version>0.2.0</version>
+  <description>ROG-Map based 3D SCAN local controller for LiberNav.</description>
+  <maintainer email="xuqichao66@outlook.com">LiberNav contributors</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav2_core</depend>
+  <depend>nav2_msgs</depend>
+  <depend>nav2_util</depend>
+  <depend>nav_msgs</depend>
+  <depend>libernav_rog_map</depend>
+  <depend>libernav_rogmap_core</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <test_depend>ament_cmake_uncrustify</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

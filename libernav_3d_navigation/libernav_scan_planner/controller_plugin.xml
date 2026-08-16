@@ -1,0 +1,8 @@
+<library path="scan_controller">
+  <class
+    name="libernav_scan_planner/ScanController"
+    type="libernav_scan_planner::ScanController"
+    base_class_type="libernav_rogmap_core::Controller">
+    <description>ROG-Map 3D local replanning and constrained SCAN trajectory controller.</description>
+  </class>
+</library>

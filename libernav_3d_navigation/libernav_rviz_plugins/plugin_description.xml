@@ -1,0 +1,8 @@
+<library path="libernav_3d_goal_panel">
+  <class
+    name="libernav_rviz_plugins/Goal3DPanel"
+    type="libernav_rviz_plugins::Goal3DPanel"
+    base_class_type="rviz_common::Panel">
+    <description>Manual three-dimensional navigation goal input for LiberNav.</description>
+  </class>
+</library>

@@ -1,0 +1,8 @@
+<library path="libernav_rogmap_planner">
+  <class
+    name="libernav_rogmap_planner/RogAStarPlanner"
+    type="libernav_rogmap_planner::RogAStarPlanner"
+    base_class_type="libernav_rogmap_core::GlobalPlanner">
+    <description>ROG-Map three-dimensional grid A-star planner.</description>
+  </class>
+</library>
