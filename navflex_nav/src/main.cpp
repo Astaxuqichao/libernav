@@ -12,15 +12,19 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
-  auto selector = std::make_shared<rclcpp::Node>("navflex_nav");
+  rclcpp::NodeOptions selector_options;
+  selector_options.enable_rosout(false);
+  auto selector = std::make_shared<rclcpp::Node>("navflex_nav", selector_options);
   selector->declare_parameter("navigation_type", "costmap");
   const std::string navigation_type = selector->get_parameter("navigation_type").as_string();
   selector.reset();
 
   rclcpp::NodeOptions costmap_options;
+  costmap_options.enable_rosout(false);
   costmap_options.arguments(
     {"--ros-args", "-r", "__node:=navflex_nav", "-r", "__ns:=/costmap"});
   rclcpp::NodeOptions rogmap_options;
+  rogmap_options.enable_rosout(false);
   rogmap_options.arguments(
     {"--ros-args", "-r", "__node:=navflex_nav", "-r", "__ns:=/rogmap"});
   std::vector<std::shared_ptr<nav2_util::LifecycleNode>> navigation_nodes;

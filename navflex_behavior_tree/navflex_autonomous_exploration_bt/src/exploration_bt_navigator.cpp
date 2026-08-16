@@ -23,7 +23,8 @@ class ExplorationBtNavigator : public rclcpp::Node
 {
 public:
   ExplorationBtNavigator()
-  : rclcpp::Node("exploration_bt_navigator"), cancel_requested_(false), active_(false)
+  : rclcpp::Node("exploration_bt_navigator", rclcpp::NodeOptions().enable_rosout(false)),
+    cancel_requested_(false), active_(false)
   {
     const auto share_dir = ament_index_cpp::get_package_share_directory(
       "navflex_autonomous_exploration_bt");

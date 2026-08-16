@@ -1,7 +1,9 @@
 #include "omni_fake_node/omni_fake_node.hpp"
 
 OmniFakeNode::OmniFakeNode(const rclcpp::NodeOptions & options)
-: rclcpp::Node("omni_fake_node", options),
+: rclcpp::Node("omni_fake_node", [](rclcpp::NodeOptions node_options) {
+    return node_options.enable_rosout(false);
+  }(options)),
   x_(0.0), y_(0.0), theta_(0.0),
   vx_(0.0), vy_(0.0), wz_(0.0),
   is_first_update_(true)

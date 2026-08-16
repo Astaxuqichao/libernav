@@ -27,6 +27,7 @@ def generate_launch_description():
             executable='simulation_lidar_node',
             name='simulation_lidar_node',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             parameters=[{
                 'stage_map_topic': LaunchConfiguration('map_topic'),
                 'global_frame':    LaunchConfiguration('global_frame'),

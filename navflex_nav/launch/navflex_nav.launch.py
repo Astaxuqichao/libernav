@@ -26,6 +26,7 @@ def generate_launch_description():
             executable="navflex_nav_node",
             name="navflex_nav",
             output="screen",
+            ros_arguments=['--disable-rosout-logs'],
             parameters=[params_file, {"navigation_type": navigation_type}],
         ),
     ])

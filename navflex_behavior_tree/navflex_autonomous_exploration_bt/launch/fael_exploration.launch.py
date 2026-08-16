@@ -35,6 +35,7 @@ def generate_launch_description():
             executable='exploration_bt_navigator',
             name='exploration_bt_navigator',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             parameters=[
                 LaunchConfiguration('bt_params_file'),
                 {

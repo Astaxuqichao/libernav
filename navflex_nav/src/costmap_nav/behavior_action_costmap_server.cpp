@@ -26,7 +26,8 @@ BehaviorCostmapServer::BehaviorCostmapServer(
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_behavior_server") + ":" +
-        std::string("__node:=navflex_behavior_server")})),
+        std::string("__node:=navflex_behavior_server")}
+    ).enable_rosout(false)),
   plugin_loader_("nav2_core", "nav2_core::Behavior"),
   default_ids_{"cmd_behavior"},
   default_types_{"navflex_cmdbehavior/CmdBehavior"},

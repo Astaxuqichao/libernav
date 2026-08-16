@@ -15,7 +15,9 @@ namespace autolabor_simulation
 {
 
 SimulationLidar::SimulationLidar(const rclcpp::NodeOptions & options)
-: Node("simulation_lidar_node", options),
+: Node("simulation_lidar_node", [](rclcpp::NodeOptions node_options) {
+    return node_options.enable_rosout(false);
+  }(options)),
   tf_buffer_(this->get_clock()),
   tf_listener_(tf_buffer_)
 {

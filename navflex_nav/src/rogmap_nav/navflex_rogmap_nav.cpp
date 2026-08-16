@@ -8,7 +8,9 @@ namespace navflex_nav
 {
 
 RogMapNavNode::RogMapNavNode(const rclcpp::NodeOptions & options)
-: nav2_util::LifecycleNode("navflex_rogmap_nav", "", options)
+: nav2_util::LifecycleNode("navflex_rogmap_nav", "", [](rclcpp::NodeOptions node_options) {
+    return node_options.enable_rosout(false);
+  }(options))
 {
   RCLCPP_INFO(get_logger(), "[Navflex] RogMapNavNode created");
 }

@@ -42,7 +42,8 @@ PlannerCostmapServer::PlannerCostmapServer(
       {"--ros-args", "-r",
         std::string("navflex_planner_server") + ":" +
         std::string("__node:=") +
-        std::string("navflex_planner_server")})),
+        std::string("navflex_planner_server")}
+    ).enable_rosout(false)),
   name_action_get_path_("compute_path_to_pose"),
   gp_loader_("nav2_core", "nav2_core::GlobalPlanner"),
   default_ids_{"GridBased"},

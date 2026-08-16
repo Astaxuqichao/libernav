@@ -58,6 +58,7 @@ def generate_launch_description():
             executable='map_server',
             name='map_server',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             parameters=[
                 {'yaml_filename': map_file},
                 {'use_sim_time': use_sim_time},
@@ -67,6 +68,7 @@ def generate_launch_description():
             executable='lifecycle_manager',
             name='lifecycle_manager_map',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'autostart': autostart,
@@ -77,6 +79,7 @@ def generate_launch_description():
             executable='static_transform_publisher',
             name='static_transform_publisher',
             output='screen',
+            ros_arguments=['--disable-rosout-logs'],
             arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom']),
         LogInfo(msg='Navflex local simulation launched.'),
     ])

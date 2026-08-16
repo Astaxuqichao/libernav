@@ -100,7 +100,8 @@ ControllerRogMapServer::ControllerRogMapServer(
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_controller_server") + ":" +
-        std::string("__node:=navflex_controller_server")})),
+        std::string("__node:=navflex_controller_server")}
+    ).enable_rosout(false)),
   lp_loader_("navflex_rogmap_core", "navflex_rogmap_core::Controller"),
   default_ids_{},
   default_types_{},

@@ -10,7 +10,9 @@ namespace navflex_nav
 {
 
 CostmapNavNode::CostmapNavNode(const rclcpp::NodeOptions & options)
-: nav2_util::LifecycleNode("navflex_costmap_nav", "", options)
+: nav2_util::LifecycleNode("navflex_costmap_nav", "", [](rclcpp::NodeOptions node_options) {
+    return node_options.enable_rosout(false);
+  }(options))
 {
   RCLCPP_INFO(get_logger(), "[Navflex] CostmapNavNode created");
 }

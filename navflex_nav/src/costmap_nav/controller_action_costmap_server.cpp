@@ -94,7 +94,8 @@ ControllerCostmapServer::ControllerCostmapServer(
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_controller_server") + ":" +
-        std::string("__node:=navflex_controller_server")})),
+        std::string("__node:=navflex_controller_server")}
+    ).enable_rosout(false)),
   lp_loader_("nav2_core", "nav2_core::Controller"),
   default_ids_{"FollowPath"},
   default_types_{"dwb_core::DWBLocalPlanner"},

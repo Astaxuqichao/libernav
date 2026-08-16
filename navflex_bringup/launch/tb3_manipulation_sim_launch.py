@@ -45,6 +45,7 @@ def generate_launch_description():
     roll = LaunchConfiguration('roll')
     pitch = LaunchConfiguration('pitch')
     yaw = LaunchConfiguration('yaw')
+    rosout_disabled = ['--disable-rosout-logs']
 
     robot_description = Command([
         'xacro ',
@@ -65,6 +66,7 @@ def generate_launch_description():
             'robot_description': robot_description,
             'use_sim_time': use_sim_time,
         }],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     gzserver = ExecuteProcess(
@@ -76,6 +78,7 @@ def generate_launch_description():
             '-s', 'libgazebo_ros_factory.so',
             '-s', 'libgazebo_ros_force_system.so',
         ],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     gzclient = IncludeLaunchDescription(
@@ -96,30 +99,35 @@ def generate_launch_description():
             '-Y', yaw,
             '-timeout', '90',
         ],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=['joint_state_broadcaster', '--controller-manager', '/controller_manager'],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     imu_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=['imu_broadcaster'],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     arm_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=['arm_controller'],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     gripper_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=['gripper_controller'],
+        ros_arguments=rosout_disabled,
         output='screen')
 
     spawn_controllers_after_spawn = RegisterEventHandler(
@@ -151,6 +159,7 @@ def generate_launch_description():
         executable='map_server',
         name='map_server',
         output='screen',
+        ros_arguments=rosout_disabled,
         parameters=[{
             'use_sim_time': use_sim_time,
             'yaml_filename': map_yaml_file,
@@ -161,6 +170,7 @@ def generate_launch_description():
         executable='lifecycle_manager',
         name='lifecycle_manager_map_server',
         output='screen',
+        ros_arguments=rosout_disabled,
         parameters=[{
             'use_sim_time': use_sim_time,
             'autostart': True,
@@ -171,6 +181,7 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         arguments=['-d', rviz_config_file],
+        ros_arguments=rosout_disabled,
         output='screen',
         condition=IfCondition(rviz))
 
@@ -292,6 +303,7 @@ def generate_launch_description():
             executable='odom_fake_localization.py',
             name='odom_fake_localization',
             output='screen',
+            ros_arguments=rosout_disabled,
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'odom_topic': 'odom',

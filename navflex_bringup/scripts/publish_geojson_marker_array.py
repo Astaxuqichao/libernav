@@ -20,7 +20,7 @@ def _as_float(value, default=0.0):
 
 class GeojsonMarkerArrayPublisher(Node):
     def __init__(self):
-        super().__init__("geojson_marker_array_publisher")
+        super().__init__("geojson_marker_array_publisher", enable_rosout=False)
 
         bringup_dir = Path(get_package_share_directory("navflex_bringup"))
         default_geojson = bringup_dir / "maps" / "aws_small_house_semantics.geojson"

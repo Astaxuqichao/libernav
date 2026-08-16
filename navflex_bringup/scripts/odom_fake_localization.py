@@ -72,7 +72,7 @@ def invert_transform(translation, rotation):
 class OdomFakeLocalization(Node):
 
     def __init__(self):
-        super().__init__('odom_fake_localization')
+        super().__init__('odom_fake_localization', enable_rosout=False)
 
         self.declare_parameter('odom_topic', 'odom')
         self.declare_parameter('map_frame', 'map')

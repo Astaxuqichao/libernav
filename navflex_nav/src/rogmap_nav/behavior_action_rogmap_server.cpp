@@ -26,7 +26,8 @@ RecoveryRogMapServer::RecoveryRogMapServer(
     rclcpp::NodeOptions().arguments(
       {"--ros-args", "-r",
         std::string("navflex_behavior_server") + ":" +
-        std::string("__node:=navflex_behavior_server")})),
+        std::string("__node:=navflex_behavior_server")}
+    ).enable_rosout(false)),
   plugin_loader_("navflex_rogmap_core", "navflex_rogmap_core::Recovery"),
   default_ids_{},
   default_types_{},

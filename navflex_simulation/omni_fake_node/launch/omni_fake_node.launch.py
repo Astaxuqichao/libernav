@@ -12,6 +12,7 @@ def generate_launch_description():
         executable='omni_fake_node',
         name='omni_fake_node',
         output='screen',
+        ros_arguments=['--disable-rosout-logs'],
         parameters=[
             {'update_rate': 50.0},
             {'cmd_vel_timeout': 0.5},
