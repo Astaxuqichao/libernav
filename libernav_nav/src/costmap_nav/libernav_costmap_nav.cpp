@@ -10,7 +10,7 @@ namespace libernav_nav
 {
 
 CostmapNavNode::CostmapNavNode(const rclcpp::NodeOptions & options)
-: nav2_util::LifecycleNode("libernav_costmap_nav", "", [](rclcpp::NodeOptions node_options) {
+: nav2_util::LifecycleNode("libernav_nav", "", [](rclcpp::NodeOptions node_options) {
     return node_options.enable_rosout(false);
   }(options))
 {

@@ -676,7 +676,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: goal_pose
+        Value: /goal_pose
   Transformation:
     Current:
       Class: rviz_default_plugins/TF
@@ -707,7 +707,7 @@ Visualization Manager:
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1252
+  Height: 600
   Hide Left Dock: false
   Hide Right Dock: true
   Navigation 2:
@@ -721,6 +721,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 2304
-  X: 352
-  Y: 178
+  Width: 900
+  X: 0
+  Y: 0

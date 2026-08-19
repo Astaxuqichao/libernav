@@ -1,22 +1,22 @@
 <?xml version="1.0"?>
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <PipelineSequence name="NavigateWithRogMapReplanning">
+    <PipelineSequence name="NavigateWithCostmapReplanning">
       <RateController hz="1.0">
-        <LiberNavGetPathActionRogMap
+        <LiberNavGetPathAction
           goal="{goal}"
           message="{planner_message}"
           outcome="{planner_outcome}"
           path="{path}"
-          planner_id="RogAStar"
-          server_name="/rogmap/compute_path_to_pose"
+          planner_id="Smac2D"
+          server_name="/costmap/compute_path_to_pose"
           server_timeout="1000"
           tolerance="0.5"
           use_start="false"/>
       </RateController>
-      <LiberNavExePathActionRogMap
+      <LiberNavExePathAction
         angle_to_goal="{controller_angle_to_goal}"
-        controller_id="ScanController"
+        controller_id="FollowPath"
         dist_to_goal="{controller_dist_to_goal}"
         feedback_distance_to_goal="{controller_feedback_distance_to_goal}"
         feedback_message="{controller_feedback_message}"
@@ -26,10 +26,10 @@
         message="{controller_message}"
         outcome="{controller_outcome}"
         path="{path}"
-        server_name="/rogmap/follow_path"
+        server_name="/costmap/follow_path"
         server_timeout="1000"
-        xy_goal_tolerance="0.0"
-        yaw_goal_tolerance="0.0"/>
+        xy_goal_tolerance="0.25"
+        yaw_goal_tolerance="0.25"/>
     </PipelineSequence>
   </BehaviorTree>
 </root>

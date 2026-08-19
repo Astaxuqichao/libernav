@@ -13,7 +13,8 @@ libernav_bringup_launch.py
   └── lifecycle_manager_libernav
 ```
 
-默认后端是 costmap。ROGMap 使用内置 PCD `maps/multilevel_ramp_stairs_0p1m.pcd`，其
+默认启动 costmap 并启用 costmap 行为树导航器。选择 `navigation_type:=rogmap` 时仅启动 ROGMap
+及其行为树；选择 `navigation_type:=both` 时两套后端和行为树都会启动。ROGMap 使用内置 PCD `maps/multilevel_ramp_stairs_0p1m.pcd`，其
 全局地图默认静态，局部 ROGMap 仍接收运行时传感器点云。Costmap 和 ROGMap 可以用
 `navigation_type:=both` 同时启动，但两个控制输出必须经过速度 mux 才能连接同一底盘。
 
@@ -34,10 +35,16 @@ tools/                                地图生成和渲染脚本
 
 ## 最短操作
 
-先启动 costmap 后端，验证 LiberNav 的通用 lifecycle/action 执行层：
+默认启动 costmap 和对应行为树，验证二维导航链路：
 
 ```bash
-ros2 launch libernav_bringup libernav_bringup_launch.py navigation_type:=costmap
+ros2 launch libernav_bringup libernav_bringup_launch.py
+```
+
+如需只启动 costmap 后端但不启用行为树，可显式关闭行为树：
+
+```bash
+ros2 launch libernav_bringup libernav_bringup_launch.py use_bt_navigator:=false
 ```
 
 二维本地仿真与导航独立运行。先启动地图、全向底盘、仿真激光、TF 和 RViz：
@@ -64,10 +71,10 @@ ros2 launch libernav_bringup libernav_bringup_launch.py navigation_type:=rogmap
 ros2 launch libernav_bringup pcd_terrain_simulator_launch.py
 ```
 
-启动独立三维行为树：
+启动 ROGMap 和对应三维行为树：
 
 ```bash
-ros2 launch libernav_bringup libernav_bringup_launch.py use_bt_navigator:=true
+ros2 launch libernav_bringup libernav_bringup_launch.py navigation_type:=rogmap use_bt_navigator:=true
 ```
 
 ## ROGMap 参数组织

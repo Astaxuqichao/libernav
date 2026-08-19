@@ -36,9 +36,9 @@ def launch_setup(context, *args, **kwargs):
 
     with_route = use_route_server.perform(context).lower() in ('true', '1', 'yes')
     selected_navigation_type = navigation_type.perform(context).lower()
-    with_bt_navigator = (
-        use_bt_navigator.perform(context).lower() in ('true', '1', 'yes') and
-        selected_navigation_type in ('rogmap', 'both'))
+    bt_enabled = use_bt_navigator.perform(context).lower() in ('true', '1', 'yes')
+    with_costmap_bt = bt_enabled and selected_navigation_type in ('costmap', 'both')
+    with_rogmap_bt = bt_enabled and selected_navigation_type in ('rogmap', 'both')
     selected_chassis = chassis_model.perform(context).lower()
     if selected_navigation_type not in ('costmap', 'rogmap', 'both'):
         raise ValueError(
@@ -46,6 +46,8 @@ def launch_setup(context, *args, **kwargs):
             'Expected "costmap", "rogmap", or "both".')
     legacy_params_file = params_file_arg.perform(context)
     bt_xml = bt_xml_arg.perform(context)
+    costmap_bt_xml = os.path.join(
+        bt_dir, 'behavior_trees', 'navigate_to_pose_costmap.xml')
 
     if not bt_xml:
         bt_xml = os.path.join(
@@ -93,8 +95,10 @@ def launch_setup(context, *args, **kwargs):
         # velocity_smoother is shared with the robot base, so keep it outside
         # either navigation backend namespace.
         lifecycle_nodes.append('velocity_smoother')
-    if with_bt_navigator:
+    if with_costmap_bt:
         lifecycle_nodes.append('rogmap_bt_navigator')
+    if with_rogmap_bt:
+        lifecycle_nodes.append('rogmap/rogmap_bt_navigator')
 
     remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
     rosout_disabled = ['--disable-rosout-logs']
@@ -231,7 +235,7 @@ def launch_setup(context, *args, **kwargs):
                 {'min_prune_dist_from_goal': 1.0},
             ]))
 
-    if with_bt_navigator:
+    if with_costmap_bt:
         nodes.append(Node(
             package='libernav_rogmap_bt_navigator',
             executable='rogmap_bt_navigator',
@@ -241,7 +245,27 @@ def launch_setup(context, *args, **kwargs):
             parameters=[
                 bt_params_file,
                 {'use_sim_time': use_sim_time},
+                {'default_nav_to_pose_bt_xml': costmap_bt_xml},
+                {'goal_topic': '/goal_pose'},
+                {'rviz_point_topic': '/clicked_point'},
+            ],
+            arguments=['--ros-args', '--log-level', log_level],
+            remappings=remappings))
+
+    if with_rogmap_bt:
+        nodes.append(Node(
+            package='libernav_rogmap_bt_navigator',
+            executable='rogmap_bt_navigator',
+            namespace='rogmap',
+            name='rogmap_bt_navigator',
+            output='screen',
+            ros_arguments=rosout_disabled,
+            parameters=[
+                bt_params_file,
+                {'use_sim_time': use_sim_time},
                 {'default_nav_to_pose_bt_xml': bt_xml},
+                {'goal_topic': '/goal_pose'},
+                {'rviz_point_topic': '/clicked_point'},
             ],
             arguments=['--ros-args', '--log-level', log_level],
             remappings=remappings))
@@ -330,8 +354,8 @@ def generate_launch_description():
                               description='Respawn libernav_nav if it exits'),
         DeclareLaunchArgument('use_composition', default_value='true',
                               description='Load LiberNav lifecycle nodes into a component container'),
-        DeclareLaunchArgument('use_bt_navigator', default_value='false',
-                              description='Launch the independent ROG-Map 3D BT navigator'),
+        DeclareLaunchArgument('use_bt_navigator', default_value='true',
+                              description='Launch the behavior tree navigator for the selected backend(s)'),
         DeclareLaunchArgument('use_intra_process_comms', default_value='true',
                               description='Use intra-process communication for compatible composable data-path nodes'),
         DeclareLaunchArgument('container_name', default_value='libernav_container',

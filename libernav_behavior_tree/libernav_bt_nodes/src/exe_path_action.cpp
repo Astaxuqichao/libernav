@@ -148,6 +148,12 @@ BT_REGISTER_NODES(factory)
       };
     factory.registerBuilder<libernav_bt_nodes::ExePathAction>(
       "LiberNavExePathAction", builder);
+    factory.registerBuilder<libernav_bt_nodes::ExePathAction>(
+      "LiberNavExePathActionRogMap",
+      [](const std::string & name, const BT::NodeConfiguration & config) {
+        return std::make_unique<libernav_bt_nodes::ExePathAction>(
+          name, "/rogmap/follow_path", config);
+      });
   }
 
   // LiberNavCancelExePath
@@ -160,5 +166,11 @@ BT_REGISTER_NODES(factory)
       };
     factory.registerBuilder<libernav_bt_nodes::CancelExePathAction>(
       "LiberNavCancelExePath", builder);
+    factory.registerBuilder<libernav_bt_nodes::CancelExePathAction>(
+      "LiberNavCancelExePathRogMap",
+      [](const std::string & name, const BT::NodeConfiguration & config) {
+        return std::make_unique<libernav_bt_nodes::CancelExePathAction>(
+          name, "/rogmap/follow_path", config);
+      });
   }
 }
